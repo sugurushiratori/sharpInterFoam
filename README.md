@@ -2,7 +2,7 @@
 
 * available soon
 
-Two-phase flow solver based on a coupling of the THINC/SW and the S-CLSVOF methods.
+Customized OpenFOAM solver for two-phase flow based on a coupling of the THINC/SW and the S-CLSVOF methods.
 
 The detailed algorithm is described on the published paper: 
 
