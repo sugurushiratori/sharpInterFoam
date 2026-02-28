@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.4.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField #codeStream
+{
+    codeInclude
+    #{
+          #include "fvCFD.H"
+    #};
+
+    codeOptions
+    #{
+          -I$(LIB_SRC)/finiteVolume/lnInclude \
+          -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+
+    code
+    #{
+          const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+          const fvMesh& mesh = refCast<const fvMesh>(d.db());
+          vectorField U(mesh.nCells(), vector(0.0, 0.0, 0.0));
+
+          forAll(U, i)
+          {
+               const scalar x = mesh.C()[i][0];
+               const scalar z = mesh.C()[i][2];
+               U[i][0] =  (z - 0.5);
+               U[i][1] = 0;
+               U[i][2] = -(x - 0.5);
+          }
+          U.writeEntry("", os);
+    #};   
+};
+
+boundaryField
+{
+    "(bottom|left)"
+    {
+        type            zeroGradient;
+    }
+    "(top|right)"
+    {
+        type            zeroGradient;
+    }
+    "(front|back)"
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

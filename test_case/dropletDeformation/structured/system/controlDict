@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.0.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     sharpInterFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         10.0;
+
+deltaT          1.0e-2;
+
+writeControl    adjustableRunTime;
+
+writeInterval   1.0e-1;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  8;
+
+writeCompression no;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+maxCo           0.25;
+maxAlphaCo      0.25;
+
+maxDeltaT       1;
+
+functions
+{
+   #includeFunc solverInfo
+
+   alphaIntegral
+   {
+      type		volFieldValue;
+      libs		("libfieldFunctionObjects.so");
+      fields		(alpha.water);
+      valueOutput	false;
+      writeFields	false;
+      source		all;
+      operation		volIntegrate;
+      writeControl	timeStep;
+   }
+}
+
+// ************************************************************************* //

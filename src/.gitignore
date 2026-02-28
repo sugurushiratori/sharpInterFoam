@@ -1,0 +1,3 @@
+lib/*/lnInclude
+lib/*/Make/linux*
+solver/*/Make/linux*

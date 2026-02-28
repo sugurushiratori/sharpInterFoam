@@ -1,0 +1,192 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.4.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    PCG_FDIC
+    {
+	solver		PCG;
+	preconditioner	FDIC;
+    }
+    PBiCG_DILU
+    {
+	solver		PBiCG;
+	preconditioner	DILU;
+    }
+    PBiCGStab_DILU
+    {
+	solver		PBiCGStab;
+	preconditioner	DILU;
+    }
+
+    Coupled1
+    {
+	type		coupled;
+        solver          PBiCICG;
+	preconditioner	DILU;
+        tolerance       (1e-11 1e-11 1e-11);
+        relTol          (0 0 0);
+	maxIter		5000;
+    }
+     
+    GAMG1
+    {
+	solver 			GAMG;
+	smoother		DICGaussSeidel;
+	agglomerator		faceAreaPair;
+	nCellsInCoarsestLevel	10;
+	mergeLevels		1;
+	nPreSweeps		2;
+	nPostSweeps		2;
+	maxPreSweeps		3;
+	maxPostSweeps		3;
+	nFinestSweeps		3;
+	preSweepsLevelMultiplier	2;
+	postSweepsLevelMultiplier	2;
+	scaleCorrection		true;
+	directSolveCoarsest	true;
+	cacheAgglomeration	on;
+	interpolateCorrection	on;
+    }
+
+    Smooth1
+    {
+	solver		smoothSolver;
+	smoother	GaussSeidel;
+    }
+    Smooth2
+    {
+	solver		smoothSolver;
+	smoother	symGaussSeidel;
+    }
+
+///#####################################
+
+    "alpha.water.*"
+    {
+        nAlphaSubCycles 1;
+
+	// Settings for MULES (if THINK is disabled)
+        nAlphaCorr      2;
+        cAlpha          1;
+	icAlpha		0.25;
+
+        MULESCorr       yes;	// Switches on semi-implicit MULES
+        nLimiterIter    8;
+	alphaApplyPrevCorr	false;
+
+        SCLSVOF
+        {
+            correctPsi      yes;
+            widthFactor     1.5;
+            densityScaled   yes;
+            initializeAtanh yes;
+            denomDeltaTau   20.0;
+            factorNumLoop   3.0;
+            tolMagGradPsi   1e-8;
+	    densityFunctionHeaviside   yes;
+        }
+        THINC
+        {
+            enable          yes;
+	    epsAlpha        1e-13;
+	    epsBeta         1e-3;
+        }
+
+	$PBiCG_DILU;
+        tolerance       1e-13;
+        relTol          0;
+    }
+
+    pcorr
+    {
+	$PCG_FDIC;
+        tolerance       1e-14;
+        relTol          0;
+    }
+
+    pcorrFinal
+    {
+	    $pcorr;
+    }
+
+    p_rgh
+    {
+//	$PCG_FDIC;
+	$GAMG1;
+        tolerance       1e-13;
+        relTol          0;
+    }
+
+    p_rghFinal
+    {
+        $p_rgh;
+    }
+
+    U
+    {
+	$PBiCGStab_DILU;
+        tolerance       1e-13;
+        relTol          0;
+    }
+    UFinal
+    {
+        $U;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor   yes;
+    nOuterCorrectors    10;
+    nCorrectors         3;
+    consistent		yes;
+
+    nNonOrthogonalCorrectors 0;
+
+    residualControl
+    {
+	    "(U|p_rgh)"
+	    {
+		    tolerance	1e-5;
+		    relTol	0;
+	    }
+    }
+
+    pRefPoint (0 0 0);
+    pRefValue  0;
+}
+
+
+relaxationFactors
+{
+
+    fields
+    {
+        p_rgh         0.3;
+        ".*Final"     1.0;
+    }
+    equations
+    {
+        U		0.7;
+        ".*Final"	1.0;
+    }
+
+}
+
+
+// ************************************************************************* //

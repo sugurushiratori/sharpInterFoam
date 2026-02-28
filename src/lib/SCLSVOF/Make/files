@@ -1,0 +1,9 @@
+immiscibleIncompressibleTwoPhaseMixtureLS.C
+incompressibleTwoPhaseMixtureLS.C
+interfacePropertiesLS.C
+interfacePropertiesSolvePsi.C
+curvatureInterpolation.C
+narrowBand.C
+GodunovScheme.C
+
+LIB = $(FOAM_USER_LIBBIN)/libSCLSVOF
