@@ -46,17 +46,17 @@ Parameters particular for <b>sharpInterFoam</b> are in the file: `system/fvSolut
     densityScaled   yes;            // Switch for density-scaled CSF model
     initializeAtanh yes;            // Method for re-initialization of of level-set function. Yes: atan, No: linear
     densityFunctionHeaviside  yes;  // How to evaluate mixture density. Yes: Heaviside function, No: alpha
-    widthFactor     1.5;            // 
-    denomDeltaTau   20.0;           //
-    factorNumLoop   3.0;            //
-    tolMagGradPsi   1e-8;           //
+    widthFactor     1.5;            // For control of interface width
+    denomDeltaTau   20.0;           // Number of division for pseudo time evolution of level-set re-initialization
+    factorNumLoop   3.0;            // Number of division for pseudo time evolution of level-set re-initializetion
+    tolMagGradPsi   1e-8;           // Tolerance of Godonov scheme in Psi re-initialization
   }
  
   THINC    // parameters for THINC
   {
     enable          yes;            // Yes: THINC is enabled, No: calculated by MULES (interFoam)
-    epsAlpha        1e-13;          // 
-    epsBeta         1e-3;           //
+    epsAlpha        1e-13;          // Parameter for flux threshold
+    epsBeta         1e-3;           // Lower bound of beta
   }
 }
 ```
