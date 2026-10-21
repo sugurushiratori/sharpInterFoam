@@ -1,0 +1,11 @@
+#!/bin/sh
+# Capillary wave (Prosperetti 1981, Popinet 2009).
+#   ./Allrun [n]        n = cells per wavelength (default 32)
+cd "${0%/*}" || exit 1
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+n=${1:-32}
+sed -i "s/^n .*/n   $n;/" system/blockMeshDict
+runApplication blockMesh
+cp 0/alpha.water.org 0/alpha.water
+runApplication $(getApplication)
+python3 evaluate.py . || true

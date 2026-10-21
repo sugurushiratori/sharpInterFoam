@@ -1,0 +1,28 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+// Hysing et al. (2009) test case 1: domain [0,1] x [0,2], 2D (x-y plane)
+nx  40;           // cells per unit length (h = 1/nx); ny = 2 nx
+ny  #eval{ 2*$nx };
+dz  #eval{ 1.0/$nx };
+
+vertices
+(
+    (0 0 0) (1 0 0) (1 2 0) (0 2 0)
+    (0 0 $dz) (1 0 $dz) (1 2 $dz) (0 2 $dz)
+);
+
+blocks ( hex (0 1 2 3 4 5 6 7) ($nx $ny 1) simpleGrading (1 1 1) );
+
+boundary
+(
+    bottom { type wall; faces ((0 1 5 4)); }
+    top    { type wall; faces ((3 7 6 2)); }
+    sides  { type wall; faces ((0 4 7 3) (2 6 5 1)); }
+    frontAndBack { type empty; faces ((0 3 2 1) (4 5 6 7)); }
+);

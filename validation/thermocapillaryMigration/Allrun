@@ -1,0 +1,11 @@
+#!/bin/sh
+# Thermocapillary migration of a drop (Young, Goldstein & Block 1959).
+#   ./Allrun [n]        n = cells per drop radius (default 12)
+cd "${0%/*}" || exit 1
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+n=${1:-12}
+sed -i "s/^n .*/n   $n;/" system/blockMeshDict
+runApplication blockMesh
+cp 0/alpha.water.org 0/alpha.water
+runApplication $(getApplication)
+python3 evaluate.py . || true

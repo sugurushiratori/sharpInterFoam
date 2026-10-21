@@ -1,0 +1,66 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     sharpInterFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         2.245;          // omega0 t = 25, omega0 = sqrt(sigma k^3/(2 rho))
+deltaT          1e-4;
+
+writeControl    adjustableRunTime;
+writeInterval   0.5;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  10;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+maxCo           0.25;
+maxAlphaCo      0.25;
+maxCapillaryNo  1;
+maxDeltaT       1e-3;
+
+functions
+{
+    // Amplitude of the cos(2 pi x) mode of the interface height,
+    // a = 2 int eta cos(k x) dx = 2 int int alpha cos(k x) dx dy
+    // -> postProcessing/amplitude.dat
+    amplitude
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        name            waveAmplitude;
+        writeControl    timeStep;
+        codeInclude     #{ #include "fvCFD.H" #};
+        codeData        #{ autoPtr<OFstream> osPtr; #};
+        codeWrite
+        #{
+            const fvMesh& m = mesh();
+            const volScalarField& alpha = m.lookupObject<volScalarField>("alpha.water");
+            const scalar k = constant::mathematical::twoPi;
+            const scalar dz = m.bounds().span().z();
+            const scalarField cx(Foam::cos(k*m.C().primitiveField().component(vector::X)));
+            const scalar a = 2.0*gSum(alpha.primitiveField()*cx*m.V())/dz;
+            if (Pstream::master())
+            {
+                if (!osPtr)
+                {
+                    mkDir(m.time().globalPath()/"postProcessing");
+                    osPtr.reset(new OFstream(m.time().globalPath()/"postProcessing"/"amplitude.dat"));
+                    osPtr() << "# t a" << nl;
+                }
+                osPtr() << m.time().value() << ' ' << a << endl;
+            }
+        #};
+    }
+}

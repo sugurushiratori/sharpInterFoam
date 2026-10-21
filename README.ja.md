@@ -24,6 +24,15 @@ THINC/SW 法と S-CLSVOF 法を組み合わせた、非構造格子対応の Ope
 * 表面張力の温度依存性 `sigma(T) = sigma + sigmaTemp*(T - TRef)` を法線方向と接線方向（マランゴニ力）の両方に反映
 * 毛管時間刻み制約、接触角、移動格子、並列計算（領域分割によらず同じ結果）
 
+## 計算例
+
+| 上昇気泡（[Hysing et al. 2009](validation/risingBubble)） | Zalesak 円盤（[例題](tutorials/ZalesakDisc)） |
+|:---:|:---:|
+| <img src="docs/images/risingBubble.gif" height="320"> | <img src="docs/images/zalesakDisc.gif" height="320"> |
+
+<p align="center"><img src="docs/images/thermocapillaryCavity.gif" width="560"><br>
+熱毛管キャビティ：温度・流線・界面（<a href="tutorials/thermocapillaryCavity">例題</a>）</p>
+
 ## 対応する OpenFOAM
 
 OpenFOAM（ESI / OpenCFD）**v2412** と **v2512**。

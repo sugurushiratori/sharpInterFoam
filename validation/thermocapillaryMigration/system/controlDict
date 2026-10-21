@@ -1,0 +1,66 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     sharpInterThermoFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         3;
+deltaT          1e-4;
+
+writeControl    adjustableRunTime;
+writeInterval   1;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  10;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+maxCo           0.25;
+maxAlphaCo      0.25;
+maxCapillaryNo  1;
+maxDeltaT       1e-2;
+
+functions
+{
+    // Drop volume, centroid and velocity every time step
+    // -> postProcessing/drop.dat
+    drop
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        name            dropStatistics;
+        writeControl    timeStep;
+        codeInclude     #{ #include "fvCFD.H" #};
+        codeData        #{ autoPtr<OFstream> osPtr; #};
+        codeWrite
+        #{
+            const fvMesh& m = mesh();
+            const volScalarField& alpha = m.lookupObject<volScalarField>("alpha.water");
+            const volVectorField& U = m.lookupObject<volVectorField>("U");
+            const scalarField aV(alpha.primitiveField()*m.V());
+            const scalar vol = gSum(aV);
+            const scalar zc = gSum(aV*m.C().primitiveField().component(vector::Z))/vol;
+            const scalar wc = gSum(aV*U.primitiveField().component(vector::Z))/vol;
+            if (Pstream::master())
+            {
+                if (!osPtr)
+                {
+                    mkDir(m.time().globalPath()/"postProcessing");
+                    osPtr.reset(new OFstream(m.time().globalPath()/"postProcessing"/"drop.dat"));
+                    osPtr() << "# t volume z_c w_c" << nl;
+                }
+                osPtr() << m.time().value() << ' ' << vol << ' ' << zc << ' ' << wc << endl;
+            }
+        #};
+    }
+}

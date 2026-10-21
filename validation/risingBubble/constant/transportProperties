@@ -1,0 +1,26 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      transportProperties;
+}
+
+// Hysing et al. (2009), test case 1
+phases (water air);
+
+water   // continuous liquid, rho1 = 1000, mu1 = 10
+{
+    transportModel  Newtonian;
+    nu              0.01;
+    rho             1000;
+}
+
+air     // bubble, rho2 = 100, mu2 = 1
+{
+    transportModel  Newtonian;
+    nu              0.01;
+    rho             100;
+}
+
+sigma           24.5;

@@ -10,11 +10,13 @@ The numbers given are from the validation runs recorded in
 - `sharpInterThermoFoam`: energy equation (rho*Cp advective form, harmonic
   face conductivity, optional Cp) and Marangoni force; previously only in
   the laboratory version.
-- Temperature-dependent surface tension `sigma(T) = sigma + sigmaTemp*(T - TRef)`
-  in the normal force as well as in the tangential (Marangoni) force. With a
-  constant sigma in the normal force a drop in a temperature gradient moved
-  towards the cold side (Young-Goldstein-Block migration: -2.0 V_YGB before,
-  about +1 V_YGB after).
+- Temperature-dependent surface tension `sigma(T) = sigma + sigmaTemp*(T - TRef)`:
+  the deviation from sigma at the mean interface temperature is applied as
+  the divergence of a surface stress (normal and tangential part together),
+  so that the net force over a closed interface vanishes. The paper version
+  used a constant sigma in the normal force; a drop in a temperature
+  gradient then moved towards the cold side (Young-Goldstein-Block
+  migration: -2.0 V_YGB before, 1.1 V_YGB after).
 - Capillary time-step constraint (`maxCapillaryNo` in controlDict).
 - Moving meshes: volume-conserving (ALE) THINC update.
 - Contact-angle boundary conditions of alpha are applied to the level set.

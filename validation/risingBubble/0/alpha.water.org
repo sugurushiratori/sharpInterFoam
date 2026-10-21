@@ -1,0 +1,51 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      alpha.water;
+}
+
+// Liquid (alpha = 1) with a bubble of radius 0.25 centred at (0.5, 0.5).
+// tanh profile of width 1.5 h, consistent with the THINC/S-CLSVOF interface.
+dimensions      [0 0 0 0 0 0 0];
+internalField   #codeStream
+{
+    codeInclude
+    #{
+        #include "fvCFD.H"
+    #};
+    codeOptions
+    #{
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+    codeLibs
+    #{
+        -lmeshTools \
+        -lfiniteVolume
+    #};
+    code
+    #{
+        const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+        const fvMesh& mesh = refCast<const fvMesh>(d.db());
+        const scalar h = Foam::sqrt(gAverage(mesh.V())/(mesh.bounds().span().z()));
+        const scalar del = 1.5*h;
+        const scalar pi = constant::mathematical::pi;
+        const vector c(0.5, 0.5, 0);
+        scalarField alpha(mesh.nCells(), 0.0);
+        forAll(alpha, i)
+        {
+            vector r = mesh.C()[i] - c;
+            r.z() = 0;
+            const scalar dist = mag(r) - 0.25;
+            alpha[i] = 0.5*(1.0 + Foam::tanh(pi/del*dist));
+        }
+        alpha.writeEntry("", os);
+    #};
+};
+boundaryField
+{
+    "(bottom|top|sides)" { type zeroGradient; }
+    frontAndBack   { type empty; }
+}

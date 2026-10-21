@@ -37,6 +37,15 @@ Main features
 * Temperature-dependent surface tension `sigma(T) = sigma + sigmaTemp*(T - TRef)` in the normal and the tangential (Marangoni) force
 * Capillary time-step constraint, contact angle, moving meshes, parallel runs (results independent of the decomposition)
 
+## Examples
+
+| Rising bubble ([Hysing et al. 2009](validation/risingBubble)) | Zalesak disc ([tutorial](tutorials/ZalesakDisc)) |
+|:---:|:---:|
+| <img src="docs/images/risingBubble.gif" height="320"> | <img src="docs/images/zalesakDisc.gif" height="320"> |
+
+<p align="center"><img src="docs/images/thermocapillaryCavity.gif" width="560"><br>
+Thermocapillary cavity: temperature, streamlines and interface (<a href="tutorials/thermocapillaryCavity">tutorial</a>)</p>
+
 ## OpenFOAM versions
 
 OpenFOAM (ESI / OpenCFD) **v2412** and **v2512**.
