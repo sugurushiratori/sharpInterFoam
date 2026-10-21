@@ -101,7 +101,29 @@ class THINC
             const scalar& dt,
             const scalar& dx
         ) const;
-        
+
+        //- flux1D evaluated in the orientation of the upwind cell
+        //  (phif >= 0), so that the flux through a processor face is
+        //  computed bitwise identically on both sides
+        scalar orientedFlux1D
+        (
+            const scalar fP,
+            const scalar fN,
+            const scalar normal,
+            const scalar beta,
+            const scalar phif,
+            const scalar dt,
+            const scalar dx
+        ) const
+        {
+            return
+            (
+                phif >= 0
+              ?  flux1D(fP, fN,  normal, beta,  phif, dt, dx)
+              : -flux1D(fN, fP, -normal, beta, -phif, dt, dx)
+            );
+        }
+
 public:
 
     // Constructors

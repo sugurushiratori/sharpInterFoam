@@ -98,7 +98,7 @@ Foam::THINC::getFlux
 
         const scalar dx = meshV[ciup] / mesh.magSf()[facei];
 
-        sf[facei] = flux1D(fP, fN, nf, beta, phif, deltaT, dx);
+        sf[facei] = orientedFlux1D(fP, fN, nf, beta, phif, deltaT, dx);
     }
     
     //- 境界処理
@@ -137,7 +137,7 @@ Foam::THINC::getFlux
 //             const scalar dx = 2.0 * mag(cV - ciF);
                const scalar dx = VV / mesh.magSf().boundaryField()[patchi][facei];
 
-               psf[facei] = flux1D(vfP[facei], vfN[facei], nf, beta, phif, deltaT, dx);
+               psf[facei] = orientedFlux1D(vfP[facei], vfN[facei], nf, beta, phif, deltaT, dx);
            }
        }
        else
