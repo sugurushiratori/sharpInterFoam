@@ -51,8 +51,10 @@ volScalarField rho
         IOobject::READ_IF_PRESENT
     ),
   alpha1*rho1 + alpha2*rho2
-//    mixture.rho()    // Error on v2006
 );
+// Use the mixture density (Heaviside- or alpha-based, see densityFunctionHeaviside)
+// so that the initial rho is consistent with rho evaluated in the time loop.
+rho == mixture.rho();
 rho.oldTime();
 
 
