@@ -154,7 +154,6 @@ PIMPLE
     momentumPredictor   yes;
     nOuterCorrectors    10;
     nCorrectors         3;
-    consistent		yes;
 
     nNonOrthogonalCorrectors 0;
 
