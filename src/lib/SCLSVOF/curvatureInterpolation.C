@@ -21,25 +21,28 @@ License
     You should have received a copy of the GNU General Public License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
+
 Description
-    Extension of the interface curvature off the interface for the
-    density-scaled CSF model (paper Eq. 46):
+    Curvature for the density-scaled CSF model (paper Sec. 3.4.5): the
+    curvature must be the one of the nearest interface point, because the
+    density-scaled delta function shifts the surface force off the
+    interface.
 
-        dK/dtau + S(psi) n & grad(K) = 0,   S(psi) = psi/sqrt(psi^2 + h^2)
+    1. The raw curvature K = -div(n) is smoothed in the narrow band by two
+       passes of a weighted average over the cell and
+       its face neighbours (weights 1 + cos(pi psi/eps)), which suppresses
+       the cell-to-cell noise of the curvature of the cut cells.
+    2. The curvature is projected to the nearest interface point
+       x - psi n with a first-order Taylor expansion,
+           K(x_Gamma) = K - psi n & grad(K).
 
-    The characteristic velocity S(psi) n points away from the interface on
-    both sides, so the curvature evaluated at the interface is transported
-    outward along the normal. The equation is discretised with first-order
-    upwinding in non-conservative form, using a local pseudo time step
-    (Jacobi iteration):
+    The evaluation is local (no iteration), independent of the length scale
+    and of the domain decomposition (coupled patches are included).
 
-        K_i <- K_i + c * sum_in( |F_f| (K_nb - K_i) ) / sum_in |F_f|,
-
-    where F_f = S_f (n_f & S_f) and the sums run over the inflow faces of
-    cell i. Every update is a convex combination (bounded, monotone) and the
-    result is independent of the length scale of the problem.
-    Coupled (processor/cyclic) patches are handled through the patch
-    neighbour values; other boundaries contribute no inflow.
+    Note: an earlier pseudo-time extension (upwind solution of
+    dK/dtau + S(psi) n.grad(K) = 0) gave a good static Laplace pressure but
+    destroyed the oscillation of a deforming droplet, because it propagates
+    the noisy value of the cut cell across the band.
 
 \*---------------------------------------------------------------------------*/
 
@@ -53,83 +56,52 @@ void Foam::interfacePropertiesLS::curvatureInterpolation()
     const fvMesh& mesh = psi_.mesh();
     const labelUList& own = mesh.owner();
     const labelUList& nei = mesh.neighbour();
+    const scalar eps = widthEpsilon().value();
+    const scalar pi = constant::mathematical::pi;
 
-    const scalar h = meshSize().value();
-
-    // Pseudo-time CFL number (<= 1 for a convex update)
-    const scalar cfl = 0.5;
-
-    // Number of iterations: information has to travel over the band where
-    // the (scaled) delta function is non-zero, |psi| < eps, i.e.
-    // eps/h = widthFactor cells. Two-fold margin, cfl cells per iteration.
-    // (Computed from widthFactor, not eps/h, so that round-off in the
-    // globally reduced mesh size cannot change the count between serial
-    // and parallel runs.)
-    const label nIter =
-        label(std::ceil(2.0*params_.widthFactor/cfl - SMALL)) + 1;
-
-    // Face flux of the characteristic velocity S(psi) n
-    const surfaceScalarField psif(fvc::interpolate(psi_));
-    const surfaceScalarField F
+    // 1. Weighted smoothing within the band
+    volScalarField w
     (
-        nHatf_*psif/sqrt(sqr(psif) + dimensionedScalar(sqr(dimLength), sqr(h)))
+        IOobject
+        (
+            "curvatureWeight",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        mesh,
+        dimensionedScalar(dimless, Zero)
     );
-    const scalarField& Fi = F.primitiveField();
 
-    // Cells to update: band where the scaled delta function is non-zero
-    // (with margin)
-    boolList active(mesh.nCells(), false);
     for (const label celli : narrowBand_.C3())
     {
-        active[celli] = true;
-    }
-
-    // Sum of inflow face fluxes per cell (constant during the iteration)
-    scalarField sumIn(mesh.nCells(), Zero);
-
-    forAll(own, facei)
-    {
-        const scalar f = Fi[facei];
-        if (f < 0) sumIn[own[facei]] -= f;     // enters owner
-        else       sumIn[nei[facei]] += f;     // enters neighbour
-    }
-
-    forAll(mesh.boundary(), patchi)
-    {
-        if (K_.boundaryField()[patchi].coupled())
+        const scalar r = psi_[celli]/eps;
+        if (mag(r) < 1)
         {
-            const fvsPatchScalarField& pF = F.boundaryField()[patchi];
-            const labelUList& fc = mesh.boundary()[patchi].faceCells();
-            forAll(pF, facei)
-            {
-                if (pF[facei] < 0) sumIn[fc[facei]] -= pF[facei];
-            }
+            w[celli] = 1 + Foam::cos(pi*r);
         }
     }
+    w.correctBoundaryConditions();
 
-    scalarField dK(mesh.nCells());
+    const label nSmooth = 2;
 
-    for (label iter = 0; iter < nIter; ++iter)
+    for (label pass = 0; pass < nSmooth; ++pass)
     {
         K_.correctBoundaryConditions();
-        const scalarField& K = K_.primitiveField();
+        const scalarField K0(K_.primitiveField());
+        const scalarField& wi = w.primitiveField();
 
-        dK = Zero;
+        scalarField num(wi*K0);
+        scalarField den(wi);
 
         forAll(own, facei)
         {
-            const scalar f = Fi[facei];
             const label o = own[facei];
             const label n = nei[facei];
-
-            if (f < 0)
-            {
-                dK[o] -= f*(K[n] - K[o]);
-            }
-            else
-            {
-                dK[n] += f*(K[o] - K[n]);
-            }
+            num[o] += wi[n]*K0[n];  den[o] += wi[n];
+            num[n] += wi[o]*K0[o];  den[n] += wi[o];
         }
 
         forAll(mesh.boundary(), patchi)
@@ -138,32 +110,46 @@ void Foam::interfacePropertiesLS::curvatureInterpolation()
 
             if (pK.coupled())
             {
-                const fvsPatchScalarField& pF = F.boundaryField()[patchi];
-                const labelUList& fc = mesh.boundary()[patchi].faceCells();
                 const scalarField Knb(pK.patchNeighbourField());
+                const scalarField wnb
+                (
+                    w.boundaryField()[patchi].patchNeighbourField()
+                );
+                const labelUList& fc = mesh.boundary()[patchi].faceCells();
 
-                forAll(pF, facei)
+                forAll(fc, i)
                 {
-                    if (pF[facei] < 0)
-                    {
-                        const label c = fc[facei];
-                        dK[c] -= pF[facei]*(Knb[facei] - K[c]);
-                    }
+                    num[fc[i]] += wnb[i]*Knb[i];
+                    den[fc[i]] += wnb[i];
                 }
             }
         }
 
         scalarField& Kref = K_.primitiveFieldRef();
 
-        forAll(Kref, celli)
+        for (const label celli : narrowBand_.C3())
         {
-            if (active[celli] && sumIn[celli] > VSMALL)
+            // includes band cells with |psi| >= eps next to weighted cells,
+            // which improves grad(K) used in the projection below
+            if (den[celli] > SMALL)
             {
-                Kref[celli] += cfl*dK[celli]/sumIn[celli];
+                Kref[celli] = num[celli]/den[celli];
             }
         }
     }
 
+    K_.correctBoundaryConditions();
+
+    // 2. Projection to the nearest interface point
+    const volVectorField gradK(fvc::grad(K_));
+    scalarField Kproj(K_.primitiveField());
+
+    for (const label celli : narrowBand_.C3())
+    {
+        Kproj[celli] -= psi_[celli]*(nHatv_[celli] & gradK[celli]);
+    }
+
+    K_.primitiveFieldRef() = Kproj;
     K_.correctBoundaryConditions();
 }
 
