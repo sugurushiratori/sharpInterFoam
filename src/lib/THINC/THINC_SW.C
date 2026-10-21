@@ -1,9 +1,9 @@
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------*¥
   =========                 |
-  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   \\    /   O peration     |
-    \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
-     \\/     M anipulation  |
+  ¥¥      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   ¥¥    /   O peration     |
+    ¥¥  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
+     ¥¥/     M anipulation  |
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -31,7 +31,7 @@ Description
 Author
     Suguru SHIRATORI
 
-\*---------------------------------------------------------------------------*/
+¥*---------------------------------------------------------------------------*/
 
 #include "THINC.H"
 #include "fvCFD.H"
@@ -101,7 +101,7 @@ Foam::THINC::getFlux
         sf[facei] = flux1D(fP, fN, nf, beta, phif, deltaT, dx);
     }
     
-    //- ���E����
+    //- 境界処理
     forAll(mesh.boundary(), patchi)
     {
        fvsPatchScalarField& psf      = sf.boundaryFieldRef()[patchi];

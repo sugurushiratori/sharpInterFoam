@@ -1,9 +1,9 @@
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------*¥
   =========                 |
-  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   \\    /   O peration     |
-    \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
-     \\/     M anipulation  |
+  ¥¥      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   ¥¥    /   O peration     |
+    ¥¥  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
+     ¥¥/     M anipulation  |
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -31,7 +31,7 @@ Description
 Author
     Suguru SHIRATORI
 
-\*---------------------------------------------------------------------------*/
+¥*---------------------------------------------------------------------------*/
 
 #include "THINC.H"
 #include "fvCFD.H"
@@ -82,12 +82,12 @@ bool Foam::THINC::read()
 
 //---------------------------------------------
 //- THINC core function
-//  fP:      owner����alpha
-//  fN:      neighbour����alpha
-//  normal:  �@���x�N�g���̃t�F�C�X�ˉe
-//  phif:    ���x�̃t�F�C�X�ˉe
-//  dt:      ���ԍ���
-//  dx:      �i�q��
+//  fP:      owner側のalpha
+//  fN:      neighbour側のalpha
+//  normal:  法線ベクトルのフェイス射影
+//  phif:    速度のフェイス射影
+//  dt:      時間刻み
+//  dx:      格子幅
 //---------------------------------------------
 Foam::scalar
 Foam::THINC::flux1D
