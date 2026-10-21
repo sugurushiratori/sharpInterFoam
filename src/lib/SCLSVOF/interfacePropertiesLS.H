@@ -284,6 +284,12 @@ public:
             return psi_;
         }
 
+        //- Surface tension coefficient field
+        tmp<volScalarField> sigma() const
+        {
+            return sigmaPtr_->sigma();
+        }
+
         tmp<volScalarField> sigmaK() const
         {
             return sigmaPtr_->sigma()*K_;

@@ -103,6 +103,7 @@ int main(int argc, char *argv[])
 		{
 			#include "CourantNo.H"
 			#include "alphaCourantNo.H"
+			#include "capillaryNo.H"
 			#include "setDeltaT.H"
 		}
 			
