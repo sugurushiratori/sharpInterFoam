@@ -57,6 +57,18 @@ volScalarField rho
 rho == mixture.rho();
 rho.oldTime();
 
+// Interface normals used by THINC (see alphaEqnSubCycle.H)
+volVectorField nHatTHINC0
+(
+    IOobject("nHatTHINC0", runTime.timeName(), mesh),
+    mixture.nHatv()
+);
+volVectorField nHatTHINC
+(
+    IOobject("nHatTHINC", runTime.timeName(), mesh),
+    mixture.nHatv()
+);
+
 
 // Mass flux
 surfaceScalarField rhoPhi

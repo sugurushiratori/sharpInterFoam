@@ -6,12 +6,19 @@
 {
     const fvMesh& mesh = alpha1.mesh();
 
+    // Explicit THINC step from the old-time value of the (sub-)step: in PIMPLE
+    // outer iterations other than the first, alpha1 holds the result of the
+    // previous outer iteration and must not be used to compute the fluxes.
+    alpha1 == alpha1.oldTime();
+    alpha1.correctBoundaryConditions();
+
     scalarField& alpha1In = alpha1.ref();
     
     if(mesh.moving())
     {
         alpha1In *= (mesh.Vsc0() / mesh.Vsc());
         mixture.correctPsi();
+        nHatTHINC = mixture.nHatv();
     }
     
     const dimensionedScalar deltaT = alpha1.time().deltaT();
@@ -31,6 +38,9 @@
     alpha2 = 1.0 - alpha1;
     
     mixture.correct();
+
+    // Normal of the updated alpha for the next sub-cycle
+    nHatTHINC = mixture.nHatv();
 
 //    rhoPhi = mixture.rhof() * phi;
 
