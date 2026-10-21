@@ -114,6 +114,9 @@ private:
         //  (Marangoni effect; zero for isothermal problems)
         dimensionedScalar sigmaTemp_;
 
+        //- Reference temperature of sigma: sigma(T) = sigma + sigmaTemp*(T - TRef)
+        dimensionedScalar TRef_;
+
         //- Stabilisation for normalisation of the interface normal
         const dimensionedScalar deltaN_;
 
@@ -322,10 +325,10 @@ public:
             return sigmaPtr_->sigma();
         }
 
-        tmp<volScalarField> sigmaK() const
-        {
-            return sigmaPtr_->sigma()*K_;
-        }
+        //- sigma*K with the temperature-dependent surface tension
+        //  sigma(T) = sigma + sigmaTemp*(T - TRef) when a temperature field
+        //  "T" exists and sigmaTemp != 0 (see interfacePropertiesMarangoni.C)
+        tmp<volScalarField> sigmaK() const;
         
         
         //- Heaviside function

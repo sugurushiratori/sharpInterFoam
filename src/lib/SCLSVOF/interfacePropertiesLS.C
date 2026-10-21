@@ -417,6 +417,13 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
         dimensionSet(1, 0, -2, -1, 0),
         dict.getOrDefault<scalar>("sigmaTemp", 0)
     ),
+
+    TRef_
+    (
+        "TRef",
+        dimTemperature,
+        dict.getOrDefault<scalar>("TRef", 0)
+    ),
     
     deltaN_
     (
@@ -609,6 +616,7 @@ bool Foam::interfacePropertiesLS::read()
         Info<< "interfacePropertiesLS: sigmaTemp = " << sigmaTemp_.value()
             << endl;
     }
+    TRef_.value() = transportPropertiesDict_.getOrDefault<scalar>("TRef", 0);
      
     const dictionary* sclsvofDict =  alpha1_.mesh().solverDict(alpha1_.name()).findDict("SCLSVOF");
    

@@ -23,10 +23,15 @@ License
     along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Description
-    Marangoni (thermocapillary) force for the CSF model:
+    Temperature-dependent surface tension
+        sigma(T) = sigma + sigmaTemp*(T - TRef)       (TRef default 0)
+    for the CSF model:
+    - sigmaK(): normal force sigma(T) K n delta (used in
+      surfaceTensionForce())
+    - marangoniForce(): tangential (thermocapillary) force
         F_M = sigmaTemp * (I - n n) & grad(T) * delta
-    evaluated as a face-normal force density so that it can be added to
-    surfaceTensionForce() in the momentum and pressure equations.
+      evaluated as a face-normal force density so that it can be added to
+      surfaceTensionForce() in the momentum and pressure equations.
 
 \*---------------------------------------------------------------------------*/
 
@@ -35,6 +40,27 @@ Description
 #include "symmTransformField.H"
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::tmp<Foam::volScalarField>
+Foam::interfacePropertiesLS::sigmaK() const
+{
+    // Normal surface-tension force with sigma(T). Together with the
+    // tangential Marangoni force (marangoniForce) this is the full
+    // surface force div_s(sigma (I - nn)) = sigma K n + grad_s(sigma);
+    // with a constant sigma in the normal part the integral of the
+    // Marangoni force over a closed interface is not balanced and a drop
+    // in a temperature gradient is driven by a spurious net force.
+    const volScalarField* TPtr =
+        psi_.mesh().findObject<volScalarField>("T");
+
+    if (!TPtr || mag(sigmaTemp_.value()) < VSMALL)
+    {
+        return sigmaPtr_->sigma()*K_;
+    }
+
+    return (sigmaPtr_->sigma() + sigmaTemp_*(*TPtr - TRef_))*K_;
+}
+
 
 Foam::tmp<Foam::surfaceScalarField>
 Foam::interfacePropertiesLS::marangoniForce() const
