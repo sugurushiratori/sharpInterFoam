@@ -138,50 +138,79 @@ Foam::interfacePropertiesLS::forcingTerm(const volScalarField& psi)
         )
      );
      volScalarField& FF = tFF.ref();
-     
-     volScalarField rr = psi0_;
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
+
+     // Sum and number of face neighbours with the opposite sign of f,
+     // including neighbours across coupled (processor/cyclic) patches so
+     // that the result does not depend on the domain decomposition.
+     const labelUList& own = mesh.owner();
+     const labelUList& nei = mesh.neighbour();
+
+     auto oppositeSignSum = [&]
+     (
+         const volScalarField& f,
+         scalarField& sum,
+         labelList& cnt
+     )
      {
-         const label cid = *iter;
-         scalar sum = 0.0;
-         label count = 0;
-         forAll(mesh.cellCells()[cid], ccid)
+         sum = Zero;
+         cnt = Zero;
+         const scalarField& fi = f.primitiveField();
+
+         forAll(own, facei)
          {
-              label ncid = mesh.cellCells()[cid][ccid];
-              if(psi0_[ncid] * psi0_[cid] < 0.0)
-              {
-                  sum += psi0_[ncid];
-                  count ++;
-              }
+             const label o = own[facei];
+             const label n = nei[facei];
+             if (fi[o]*fi[n] < 0)
+             {
+                 sum[o] += fi[n]; ++cnt[o];
+                 sum[n] += fi[o]; ++cnt[n];
+             }
          }
-         if(count == 0)
+
+         forAll(f.boundaryField(), patchi)
+         {
+             const fvPatchScalarField& pf = f.boundaryField()[patchi];
+             if (pf.coupled())
+             {
+                 const scalarField fn(pf.patchNeighbourField());
+                 const labelUList& fc = pf.patch().faceCells();
+                 forAll(fc, i)
+                 {
+                     const label c = fc[i];
+                     if (fi[c]*fn[i] < 0)
+                     {
+                         sum[c] += fn[i]; ++cnt[c];
+                     }
+                 }
+             }
+         }
+     };
+
+     scalarField sum(mesh.nCells());
+     labelList cnt(mesh.nCells());
+
+     // Ratio of psi0 to the sum of its opposite-sign neighbours
+     // (kept fixed during the re-initialisation)
+     oppositeSignSum(psi0_, sum, cnt);
+     scalarField rr(psi0_.primitiveField());
+     for (const label cid : narrowBand_.C3())
+     {
+         if (cnt[cid] == 0)
              rr[cid] = 0;
-         else 
-             rr[cid] /= sum + VSMALL;
+         else
+             rr[cid] /= sum[cid] + VSMALL;
      }
-     
+
      const dimensionedScalar eps = widthEpsilon();
-     
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
+
+     oppositeSignSum(psi, sum, cnt);
+     for (const label cid : narrowBand_.C3())
      {
-         const label cid = *iter;
-         scalar sum = 0.0;
-         label  count = 0;
-         forAll(mesh.cellCells()[cid], ccid)
-         {
-              label ncid = mesh.cellCells()[cid][ccid];
-              if(psi[ncid] * psi[cid] < 0.0)
-              {
-                  sum += psi[ncid];
-                  count ++;
-              }
-         }
-         if(count == 0)
+         if (cnt[cid] == 0)
              FF[cid] = 0.0;
-         else 
-             FF[cid] = (rr[cid] * sum - psi[cid]) / eps.value();
+         else
+             FF[cid] = (rr[cid]*sum[cid] - psi[cid])/eps.value();
      }
-     
 
      FF.correctBoundaryConditions();
      
