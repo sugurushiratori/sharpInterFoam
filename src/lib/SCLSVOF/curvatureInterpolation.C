@@ -55,15 +55,18 @@ void Foam::interfacePropertiesLS::curvatureInterpolation()
     const labelUList& nei = mesh.neighbour();
 
     const scalar h = meshSize().value();
-    const scalar eps = widthEpsilon().value();
 
     // Pseudo-time CFL number (<= 1 for a convex update)
     const scalar cfl = 0.5;
 
     // Number of iterations: information has to travel over the band where
-    // the (scaled) delta function is non-zero, |psi| < eps, i.e. eps/h cells.
-    // Two-fold margin, cfl cells per iteration.
-    const label nIter = label(std::ceil(2.0*eps/(cfl*h))) + 1;
+    // the (scaled) delta function is non-zero, |psi| < eps, i.e.
+    // eps/h = widthFactor cells. Two-fold margin, cfl cells per iteration.
+    // (Computed from widthFactor, not eps/h, so that round-off in the
+    // globally reduced mesh size cannot change the count between serial
+    // and parallel runs.)
+    const label nIter =
+        label(std::ceil(2.0*params_.widthFactor/cfl - SMALL)) + 1;
 
     // Face flux of the characteristic velocity S(psi) n
     const surfaceScalarField psif(fvc::interpolate(psi_));
