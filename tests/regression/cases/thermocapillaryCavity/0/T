@@ -1,0 +1,81 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2006                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// [kg m s K mol A cd]
+dimensions      [0 0 0 1 0 0 0];
+
+
+internalField #codeStream
+{
+    codeInclude
+    #{
+          #include "fvCFD.H"
+    #};
+
+    codeOptions
+    #{
+          -I$(LIB_SRC)/finiteVolume/lnInclude \
+          -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+
+    code
+    #{
+          const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+          const fvMesh& mesh = refCast<const fvMesh>(d.db());
+          scalarField T(mesh.nCells(), 0.0);
+
+          const scalar Tc = 0.0;
+          const scalar Th = 1.0;
+          const scalar Lx = 5.0;
+
+          forAll(T, i)
+          {
+               const scalar xx = mesh.C()[i][0];
+               const scalar val = Th - (Th-Tc) * xx / Lx;
+
+               T[i] = val;
+          }
+          T.writeEntry("", os);
+    #};   
+};
+
+boundaryField
+{
+    left
+    {
+        type            fixedValue;
+        value           uniform 1;
+    }
+
+    right
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+
+    "(top|bottom)"
+    {
+        type            zeroGradient;
+    }
+
+    "(front|back)"
+    {
+        type            empty;
+    }
+
+}
+
+// ************************************************************************* //

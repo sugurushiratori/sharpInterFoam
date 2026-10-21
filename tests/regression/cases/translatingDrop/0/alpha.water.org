@@ -1,0 +1,87 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.4.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      alpha.water;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 0 0 0 0];
+
+internalField #codeStream
+{
+    codeInclude
+    #{
+          #include "fvCFD.H"
+    #};
+
+    codeOptions
+    #{
+          -I$(LIB_SRC)/finiteVolume/lnInclude \
+          -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+
+    code
+    #{
+          const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+          const fvMesh& mesh = refCast<const fvMesh>(d.db());
+          scalarField alpha(mesh.nCells(), 0.0);
+
+          const scalar x0 = -1.0;
+          const scalar y0 = 0.0;
+          const scalar z0 = 0.0;
+          const scalar r0 = 0.5;
+
+          const scalar dx = pow(average(mesh.V()), 1.0/3.0).value();
+          const scalar del = dx * 1.5;
+          const scalar pi  = 4.0*atan(1.0);
+
+          label nsub = 10;
+          const scalar dxSub = dx / scalar(nsub);
+
+          forAll(alpha, i)
+          {
+               const scalar xc = mesh.C()[i][0];
+               const scalar zc = mesh.C()[i][2];
+               const scalar rr = sqrt(pow(xc-x0,2) + pow(zc-z0,2));
+               if     ( rr < r0 - 3.0*del) alpha[i] = 1.0;
+               else if( rr > r0 + 3.0*del) alpha[i] = 0.0;
+               else
+               {
+                   scalar sum = 0.0;
+                   for(label ix = 0; ix < nsub; ix++)
+                   {
+                      scalar xs = (xc -0.5*dx) +(0.5 + scalar(ix)) * dxSub;
+                      for(label kz = 0; kz < nsub; kz++)
+                      {
+                         scalar zs = (zc -0.5*dx) +(0.5 + scalar(kz)) * dxSub;
+                         const scalar rs = sqrt(pow(xs-x0,2) + pow(zs-z0,2));
+                         sum += 0.5*(1.0-tanh(pi*(rs-r0)/del));
+                      }
+                   }
+                   alpha[i] = sum /  pow(scalar(nsub),2);
+               }
+          }
+	  alpha.writeEntry("", os);
+    #};   
+};
+
+boundaryField
+{
+    #includeEtc "caseDicts/setConstraintTypes"
+
+    "(left|right|top)"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,5 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+. ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions
+cleanCase
+rm -rf 0/C 0/Cx 0/Cy 0/Cz 0/V metrics.json

@@ -1,0 +1,36 @@
+{
+  "_note": "Reference values from OpenFOAM v2412 (gcc 13, 2 cores). Tolerances allow for OpenFOAM version and compiler differences; exactness checks use absolute bounds.",
+  "zalesak": {
+    "_description": "Zalesak disc, 50x50, one revolution (THINC/SW + S-CLSVOF advection)",
+    "E_alpha": {"value": 0.160103, "rtol": 0.03},
+    "volume_change": {"max": 1e-6},
+    "alpha_min": {"min": -1e-6},
+    "alpha_max": {"max": 1.000001}
+  },
+  "staticDroplet": {
+    "_description": "Static droplet, densityScaled CSF, 1 time step (paper Table 2, N = 20)",
+    "U_max": {"value": 8.323e-4, "rtol": 0.1},
+    "E_p": {"value": 0.0374948, "rtol": 0.02}
+  },
+  "translatingDrop": {
+    "_description": "Drop translating with uniform velocity, density ratio 1000 (mass-momentum consistency)",
+    "U_error_max": {"max": 1e-10}
+  },
+  "twoLayerConduction": {
+    "_description": "Steady heat conduction through two layers, conductivity ratio 10 (harmonic face conductivity)",
+    "q_bottom_error": {"max": 1e-6},
+    "q_top_error": {"max": 1e-6}
+  },
+  "thermocapillaryCavity": {
+    "_description": "Thermocapillary cavity 50x20 (x-y plane), t = 0.05, serial and 2 processes",
+    "U_max": {"value": 0.300397, "rtol": 0.02},
+    "parallel_U_diff": {"max": 1e-7},
+    "parallel_alpha_diff": {"max": 1e-9}
+  },
+  "movingMesh": {
+    "_description": "Moving wall with mesh motion: liquid volume conservation (ALE THINC update)",
+    "volume_change": {"max": 1e-10},
+    "alpha_min": {"min": -1e-6},
+    "alpha_max": {"max": 1.001}
+  }
+}
