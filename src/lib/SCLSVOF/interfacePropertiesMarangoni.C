@@ -145,7 +145,7 @@ Foam::interfacePropertiesLS::marangoniForce() const
 
     // Gauss divergence with linear face interpolation (independent of the
     // schemes in fvSchemes)
-    const volVectorField f
+    volVectorField f
     (
         IOobject
         (
@@ -159,8 +159,68 @@ Foam::interfacePropertiesLS::marangoniForce() const
         fvc::surfaceIntegrate(mesh.Sf() & linearInterpolate(stress)),
         extrapolatedCalculatedFvPatchVectorField::typeName
     );
+    f.correctBoundaryConditions();
 
-    maf = linearInterpolate(f) & (mesh.Sf()/mesh.magSf());
+    if (!params_.densityScaled)
+    {
+        maf = linearInterpolate(f) & (mesh.Sf()/mesh.magSf());
+        return tmaf;
+    }
+
+    // Density-scaled model: the force per unit delta, interpolated between
+    // the two cells weighted with their delta, is applied with the
+    // density-scaled face delta (as in surfaceTensionForce()). A linear
+    // interpolation of the cell force would put force on faces of the
+    // light phase, where it drives large spurious velocities
+    // (thermocapillary cavity, gas density 1e-3: max|U| 1.4 instead of 0.3).
+    const scalarField& dI = deltaC.primitiveField();
+    const scalar small = 1e-12*gMax(dI) + VSMALL;
+    const vectorField g(f.primitiveField()/max(dI, small));
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const vectorField& Sf = mesh.Sf().primitiveField();
+    const scalarField& magSf = mesh.magSf().primitiveField();
+    scalarField& mI = maf.primitiveFieldRef();
+
+    forAll(own, facei)
+    {
+        const label o = own[facei];
+        const label n = nei[facei];
+        const scalar w = dI[o] + dI[n];
+        if (w > small)
+        {
+            const vector gf((dI[o]*g[o] + dI[n]*g[n])/w);
+            mI[facei] = (gf & Sf[facei])/magSf[facei]*scaledDeltaFace_[facei];
+        }
+    }
+
+    // Coupled patches: same weighting with the neighbour-cell values
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvPatch& pp = mesh.boundary()[patchi];
+        if (!pp.coupled())
+        {
+            continue;
+        }
+        const labelUList& fc = pp.faceCells();
+        const scalarField dN(deltaC.boundaryField()[patchi].patchNeighbourField());
+        const vectorField fN(f.boundaryField()[patchi].patchNeighbourField());
+        const vectorField& pSf = mesh.Sf().boundaryField()[patchi];
+        const scalarField& pMagSf = mesh.magSf().boundaryField()[patchi];
+        const scalarField& pDelta = scaledDeltaFace_.boundaryField()[patchi];
+        scalarField& pm = maf.boundaryFieldRef()[patchi];
+
+        forAll(fc, i)
+        {
+            const scalar dO = dI[fc[i]];
+            const scalar w = dO + dN[i];
+            if (w > small)
+            {
+                const vector gf((dO*g[fc[i]] + fN[i])/w);
+                pm[i] = (gf & pSf[i])/pMagSf[i]*pDelta[i];
+            }
+        }
+    }
 
     return tmaf;
 }

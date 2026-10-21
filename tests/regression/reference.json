@@ -23,7 +23,7 @@
   },
   "thermocapillaryCavity": {
     "_description": "Thermocapillary cavity 50x20 (x-y plane), t = 0.05, serial and 2 processes",
-    "U_max": {"value": 0.409475, "rtol": 0.02},
+    "U_max": {"value": 0.308771, "rtol": 0.02},
     "parallel_U_diff": {"max": 1e-7},
     "parallel_alpha_diff": {"max": 1e-9}
   },
