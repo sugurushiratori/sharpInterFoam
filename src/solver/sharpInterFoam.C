@@ -153,7 +153,9 @@ int main(int argc, char *argv[])
 			#include "alphaControls.H"
 			#include "alphaEqnSubCycle.H"
 	
-			mixture.correct();
+			// mixture.correct() (level-set re-initialisation, Heaviside and
+			// property update) is already called at the end of each alpha
+			// sub-cycle in alphaEqn_THINC.H / alphaEqn_MULES.H.
 			mixture.correctSurfaceTensionForce();
 	
 			if(pimple.frozenFlow())
