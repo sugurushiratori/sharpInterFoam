@@ -69,6 +69,14 @@ protected:
         dimensionedScalar kappa1_;
         dimensionedScalar kappa2_;
 
+        //- Specific heat capacities (optional entry "Cp" in both phase
+        //  dictionaries). If not given, rho*Cp = 1 is assumed in both
+        //  phases, i.e. the energy equation reduces to the original
+        //  diffusivity form with lambda = kappa.
+        bool hasCp_;
+        dimensionedScalar Cp1_;
+        dimensionedScalar Cp2_;
+
         const volVectorField& U_;
         const surfaceScalarField& phi_;
 
@@ -164,8 +172,18 @@ public:
         tmp<surfaceScalarField> nuf() const;
         
         
-        //- Return the thermal diffusitvity
+        //- Return the thermal diffusivity
         tmp<volScalarField> kappa() const;
+
+        //- Volumetric heat capacity rho*Cp of the mixture
+        tmp<volScalarField> rhoCp() const;
+
+        //- Thermal conductivity lambda = rho*Cp*kappa of the mixture
+        tmp<volScalarField> lambda() const;
+
+        //- Face thermal conductivity, harmonic interpolation of lambda
+        //  (continuity of the heat flux across the interface)
+        tmp<surfaceScalarField> lambdaf() const;
 
         //- Correct the laminar viscosity
         virtual void correct()

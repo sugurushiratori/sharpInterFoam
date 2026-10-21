@@ -11,3 +11,18 @@ volScalarField T
     ),
     mesh
 );
+
+// Volumetric heat capacity of the mixture (old-time value needed by TEqn)
+volScalarField rhoCp
+(
+    IOobject
+    (
+        "rhoCp",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mixture.rhoCp()
+);
+rhoCp.oldTime();
