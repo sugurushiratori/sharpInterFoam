@@ -33,6 +33,8 @@ License
 #include "upwind.H"
 #include "downwind.H"
 #include "unitConversion.H"
+#include "emptyPolyPatch.H"
+#include "wedgePolyPatch.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -147,8 +149,37 @@ void Foam::interfacePropertiesLS::calculateK()
 
 Foam::dimensionedScalar Foam::interfacePropertiesLS::meshSize() const
 {
-    // determine length scale from average cell volume
-    return dimensionedScalar("meshSize", cbrt(average(alpha1_.mesh().V())) );
+    const fvMesh& mesh = alpha1_.mesh();
+
+    // 2D (empty) and axisymmetric (wedge) meshes: the cell extent in the
+    // non-solved direction is unrelated to the resolution, so the mesh size
+    // is taken from the area of the empty/wedge faces instead of the cell
+    // volume.
+    if (mesh.nSolutionD() < 3)
+    {
+        scalar sumA = 0;
+        label nFaces = 0;
+
+        for (const polyPatch& pp : mesh.boundaryMesh())
+        {
+            if (isA<emptyPolyPatch>(pp) || isA<wedgePolyPatch>(pp))
+            {
+                sumA += sum(mag(pp.faceAreas()));
+                nFaces += pp.size();
+            }
+        }
+
+        reduce(sumA, sumOp<scalar>());
+        reduce(nFaces, sumOp<label>());
+
+        if (nFaces > 0)
+        {
+            return dimensionedScalar("meshSize", dimLength, Foam::sqrt(sumA/nFaces));
+        }
+    }
+
+    // 3D: length scale from the average cell volume
+    return dimensionedScalar("meshSize", cbrt(average(mesh.V())));
 }
 
 void Foam::interfacePropertiesLS::calDeltaFunc()
