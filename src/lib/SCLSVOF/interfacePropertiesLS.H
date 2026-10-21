@@ -175,8 +175,6 @@ private:
         tmp<volScalarField> psi_timeStepFunc(const volScalarField& psi);
         tmp<volScalarField> psi_timeStepFunc2(const volScalarField& psi);
         
-        void K_timeAdvanceRK3(volScalarField& K, const dimensionedScalar& deltaTau);
-        tmp<volScalarField> K_timeStepFunc(const volScalarField& K);
         
         //- calculate gradPsi with Godunov Hamiltonian scheme
         tmp<volVectorField> calGradPsi

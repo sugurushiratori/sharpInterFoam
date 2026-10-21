@@ -21,88 +21,147 @@ License
     You should have received a copy of the GNU General Public License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
+Description
+    Extension of the interface curvature off the interface for the
+    density-scaled CSF model (paper Eq. 46):
+
+        dK/dtau + S(psi) n & grad(K) = 0,   S(psi) = psi/sqrt(psi^2 + h^2)
+
+    The characteristic velocity S(psi) n points away from the interface on
+    both sides, so the curvature evaluated at the interface is transported
+    outward along the normal. The equation is discretised with first-order
+    upwinding in non-conservative form, using a local pseudo time step
+    (Jacobi iteration):
+
+        K_i <- K_i + c * sum_in( |F_f| (K_nb - K_i) ) / sum_in |F_f|,
+
+    where F_f = S_f (n_f & S_f) and the sums run over the inflow faces of
+    cell i. Every update is a convex combination (bounded, monotone) and the
+    result is independent of the length scale of the problem.
+    Coupled (processor/cyclic) patches are handled through the patch
+    neighbour values; other boundaries contribute no inflow.
+
 \*---------------------------------------------------------------------------*/
 
-
 #include "interfacePropertiesLS.H"
-#include "alphaContactAngleTwoPhaseFvPatchScalarField.H"
-#include "mathematicalConstants.H"
 #include "fvCFD.H"
-#include "CMULES.H"
-#include "gaussConvectionScheme.H"
-#include "surfaceInterpolate.H"
-#include "upwind.H"
-#include "downwind.H"
-#include "unitConversion.H"
 
-void Foam::interfacePropertiesLS::K_timeAdvanceRK3(volScalarField& K, const dimensionedScalar& deltaTau)
-{
-     volScalarField K1 = K + deltaTau * K_timeStepFunc(K);
-     volScalarField K2 = 3.0/4.0 * K + 1.0/4.0 * K1 + 1.0/4.0*deltaTau * K_timeStepFunc(K1);
-     volScalarField K3 = 1.0/3.0 * K + 2.0/3.0 * K2 + 2.0/3.0*deltaTau * K_timeStepFunc(K2);
-     
-     K = K3;
-}
-
-Foam::tmp<volScalarField>
-Foam::interfacePropertiesLS::K_timeStepFunc(const volScalarField& K)
-{
-     const fvMesh& mesh  = K.mesh();
-     tmp<volScalarField> tKDt
-     (
-        new volScalarField
-        (
-          IOobject
-          (
-              "KDt",
-              K.time().timeName(),
-              mesh
-          ),
-          mesh,
-          dimensionedScalar("KDt", dimless / dimLength, scalar(0)),
-          zeroGradientFvPatchField<scalar>::typeName
-        )
-     );     
-     volScalarField& KDt = tKDt.ref();
-     
-     surfaceScalarField nPsi = nHatf_ * fvc::interpolate(psi_);
-
-     surfaceScalarField Kf = fvc::interpolate(K);
-
-     KDt = fvc::div(nPsi * Kf);
-     /*
-     volScalarField signFunc = calSignFunc(psi_);
-     volVectorField gradK = fvc::grad(K);
-     volScalarField ngK = nHatv_ & gradK;
-
-     forAll(KDt, ci)
-     {
-        KDt[ci] = signFunc[ci] * ngK[ci];
-     }
-     */
-     KDt.correctBoundaryConditions();
-     
-     return tKDt;
-}
+// * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
 void Foam::interfacePropertiesLS::curvatureInterpolation()
 {
-    Info << "interpolate the curvature for density-scaled CSF...";
-    const fvMesh& mesh  = psi_.mesh();
+    const fvMesh& mesh = psi_.mesh();
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
 
-    const scalar nsub = params_.denomDeltaTau;
-    dimensionedScalar deltaTau( "deltaTau", dimless, scalar( meshSize().value() / nsub) );
-    const label numLoop = label(widthFactor() * nsub * params_.factorNumLoop);
+    const scalar h = meshSize().value();
+    const scalar eps = widthEpsilon().value();
 
-    label corr = 0;
-    for(corr = 0; corr < numLoop; corr++)
-    {         
-        K_timeAdvanceRK3(K_, deltaTau);
+    // Pseudo-time CFL number (<= 1 for a convex update)
+    const scalar cfl = 0.5;
+
+    // Number of iterations: information has to travel over the band where
+    // the (scaled) delta function is non-zero, |psi| < eps, i.e. eps/h cells.
+    // Two-fold margin, cfl cells per iteration.
+    const label nIter = label(std::ceil(2.0*eps/(cfl*h))) + 1;
+
+    // Face flux of the characteristic velocity S(psi) n
+    const surfaceScalarField psif(fvc::interpolate(psi_));
+    const surfaceScalarField F
+    (
+        nHatf_*psif/sqrt(sqr(psif) + dimensionedScalar(sqr(dimLength), sqr(h)))
+    );
+    const scalarField& Fi = F.primitiveField();
+
+    // Cells to update: band where the scaled delta function is non-zero
+    // (with margin)
+    boolList active(mesh.nCells(), false);
+    for (const label celli : narrowBand_.C3())
+    {
+        active[celli] = true;
+    }
+
+    // Sum of inflow face fluxes per cell (constant during the iteration)
+    scalarField sumIn(mesh.nCells(), Zero);
+
+    forAll(own, facei)
+    {
+        const scalar f = Fi[facei];
+        if (f < 0) sumIn[own[facei]] -= f;     // enters owner
+        else       sumIn[nei[facei]] += f;     // enters neighbour
+    }
+
+    forAll(mesh.boundary(), patchi)
+    {
+        if (K_.boundaryField()[patchi].coupled())
+        {
+            const fvsPatchScalarField& pF = F.boundaryField()[patchi];
+            const labelUList& fc = mesh.boundary()[patchi].faceCells();
+            forAll(pF, facei)
+            {
+                if (pF[facei] < 0) sumIn[fc[facei]] -= pF[facei];
+            }
+        }
+    }
+
+    scalarField dK(mesh.nCells());
+
+    for (label iter = 0; iter < nIter; ++iter)
+    {
+        K_.correctBoundaryConditions();
+        const scalarField& K = K_.primitiveField();
+
+        dK = Zero;
+
+        forAll(own, facei)
+        {
+            const scalar f = Fi[facei];
+            const label o = own[facei];
+            const label n = nei[facei];
+
+            if (f < 0)
+            {
+                dK[o] -= f*(K[n] - K[o]);
+            }
+            else
+            {
+                dK[n] += f*(K[o] - K[n]);
+            }
+        }
+
+        forAll(mesh.boundary(), patchi)
+        {
+            const fvPatchScalarField& pK = K_.boundaryField()[patchi];
+
+            if (pK.coupled())
+            {
+                const fvsPatchScalarField& pF = F.boundaryField()[patchi];
+                const labelUList& fc = mesh.boundary()[patchi].faceCells();
+                const scalarField Knb(pK.patchNeighbourField());
+
+                forAll(pF, facei)
+                {
+                    if (pF[facei] < 0)
+                    {
+                        const label c = fc[facei];
+                        dK[c] -= pF[facei]*(Knb[facei] - K[c]);
+                    }
+                }
+            }
+        }
+
+        scalarField& Kref = K_.primitiveFieldRef();
+
+        forAll(Kref, celli)
+        {
+            if (active[celli] && sumIn[celli] > VSMALL)
+            {
+                Kref[celli] += cfl*dK[celli]/sumIn[celli];
+            }
+        }
     }
 
     K_.correctBoundaryConditions();
-    
-    Info << " finished." << nl;
 }
 
 
