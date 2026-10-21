@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori, Tokyo City University
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -141,33 +142,5 @@ Foam::label Foam::narrowBand::findCell(const point& location) const
     }
 }
 
-void Foam::narrowBand::addDummy()
-{
-    // CPUによって補間対象セルの数が大きく異なる場合にエラーになるので
-    // 数を合わせるための処置 (もっと良い方法ありそう・・)
-    
-    const label nCells = psi_.mesh().nCells();
-    if (nCells == 0) return;
-    
-    label num = band2_.size();
-    label max = num;
-    reduce(max, maxOp<label>());
-     
-    DynamicList<label> list;
-    
-    forAllConstIter(labelList, band2_, iter)
-    {
-        list.append(*iter); 
-    }
-    
-    label cid = 0;
-    while(num < max) {list.append(cid % nCells); num++; cid++;}
-
-    band2_.clear();
-    band2_.transfer(list);
-    
-//    band2_ = list.xfer();
-
-}
 
 // ************************************************************************* //

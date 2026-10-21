@@ -1,25 +1,26 @@
-/*---------------------------------------------------------------------------*¥
+/*---------------------------------------------------------------------------*\
   =========                 |
-  ¥¥      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   ¥¥    /   O peration     |
-    ¥¥  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
-     ¥¥/     M anipulation  |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
+     \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori, Tokyo City University
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::THINC
@@ -31,7 +32,7 @@ Description
 Author
     Suguru SHIRATORI
 
-¥*---------------------------------------------------------------------------*/
+\*---------------------------------------------------------------------------*/
 
 #include "THINC.H"
 #include "fvCFD.H"
@@ -101,7 +102,7 @@ Foam::THINC::getFlux
         sf[facei] = orientedFlux1D(fP, fN, nf, beta, phif, deltaT, dx);
     }
     
-    //- 境界処理
+    // Boundary faces
     forAll(mesh.boundary(), patchi)
     {
        fvsPatchScalarField& psf      = sf.boundaryFieldRef()[patchi];
