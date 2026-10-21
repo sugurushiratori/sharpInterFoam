@@ -14,6 +14,4 @@
     TEqn.solve();
 
     fvOptions.correct(T);
-
-    mixture.correct();
 }
