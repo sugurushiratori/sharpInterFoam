@@ -109,6 +109,10 @@ private:
         //- Surface tension
         autoPtr<surfaceTensionModel> sigmaPtr_;
 
+        //- Temperature coefficient of the surface tension, d(sigma)/dT
+        //  (Marangoni effect; zero for isothermal problems)
+        dimensionedScalar sigmaTemp_;
+
         //- Stabilisation for normalisation of the interface normal
         const dimensionedScalar deltaN_;
 
@@ -324,6 +328,18 @@ public:
         
         
         tmp<surfaceScalarField> surfaceTensionForce() const;
+
+        //- Temperature coefficient of the surface tension
+        const dimensionedScalar& sigmaTemp() const
+        {
+            return sigmaTemp_;
+        }
+
+        //- Face-normal component of the Marangoni force,
+        //  sigmaTemp*(I - n n)&grad(T)*delta, returned as a face force
+        //  density consistent with surfaceTensionForce().
+        //  Returns zero if no temperature field "T" is registered.
+        tmp<surfaceScalarField> marangoniForce() const;
                 
         //- Indicator of the proximity of the interface
         //  Field values are 1 near and 0 away for the interface.

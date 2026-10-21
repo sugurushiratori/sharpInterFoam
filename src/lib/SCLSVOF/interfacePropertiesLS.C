@@ -351,6 +351,13 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
     ),
 
     sigmaPtr_(surfaceTensionModel::New(dict, alpha1.mesh())),
+
+    sigmaTemp_
+    (
+        "sigmaTemp",
+        dimensionSet(1, 0, -2, -1, 0),
+        dict.getOrDefault<scalar>("sigmaTemp", 0)
+    ),
     
     deltaN_
     (
@@ -524,6 +531,14 @@ bool Foam::interfacePropertiesLS::read()
 {
     alpha1_.mesh().solverDict(alpha1_.name()).readEntry("cAlpha", cAlpha_);
     sigmaPtr_->readDict(transportPropertiesDict_);
+
+    if (transportPropertiesDict_.found("sigmaTemp"))
+    {
+        sigmaTemp_.value() =
+            transportPropertiesDict_.get<scalar>("sigmaTemp");
+        Info<< "interfacePropertiesLS: sigmaTemp = " << sigmaTemp_.value()
+            << endl;
+    }
      
     const dictionary* sclsvofDict =  alpha1_.mesh().solverDict(alpha1_.name()).findDict("SCLSVOF");
    

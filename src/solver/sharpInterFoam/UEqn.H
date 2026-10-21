@@ -23,6 +23,7 @@
             (
                 (
                     mixture.surfaceTensionForce()
+                  + mixture.marangoniForce()
                   - ghf*fvc::snGrad(rho)
                   - fvc::snGrad(p_rgh)
                 ) * mesh.magSf()

@@ -1,6 +1,7 @@
 EXE_INC = \
-    -I../lib/THINC \
-    -I../lib/SCLSVOF \
+    -I../../lib/THINC \
+    -I../../lib/SCLSVOF \
+    -I../sharpInterFoam \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/finiteVolume \
     -I$(LIB_SRC)/meshTools/lnInclude \
