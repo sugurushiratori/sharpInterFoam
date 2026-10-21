@@ -8,7 +8,7 @@
     Copyright (C) 2011-2015 OpenFOAM Foundation
     Copyright (C) 2017 OpenCFD Ltd
 -------------------------------------------------------------------------------
-    Copyright (C) 2021-2026 Suguru Shiratori, Tokyo City University
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
     This file is part of sharpInterFoam, a derivative of OpenFOAM.
 

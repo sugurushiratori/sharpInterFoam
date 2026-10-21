@@ -5,7 +5,7 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
-    Copyright (C) 2021-2026 Suguru Shiratori, Tokyo City University
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
     This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
@@ -325,10 +325,13 @@ public:
             return sigmaPtr_->sigma();
         }
 
-        //- sigma*K with the temperature-dependent surface tension
-        //  sigma(T) = sigma + sigmaTemp*(T - TRef) when a temperature field
-        //  "T" exists and sigmaTemp != 0 (see interfacePropertiesMarangoni.C)
+        //- sigma*K with the surface tension at the mean interface
+        //  temperature (the deviation from it is in marangoniForce(), see
+        //  interfacePropertiesMarangoni.C)
         tmp<volScalarField> sigmaK() const;
+
+        //- Delta-weighted mean temperature on the interface
+        scalar interfaceMeanT(const volScalarField& T) const;
         
         
         //- Heaviside function

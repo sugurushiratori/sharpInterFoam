@@ -5,7 +5,7 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
-    Copyright (C) 2021-2026 Suguru Shiratori, Tokyo City University
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
     This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
@@ -26,11 +26,11 @@ Description
     Temperature-dependent surface tension
         sigma(T) = sigma + sigmaTemp*(T - TRef)       (TRef default 0)
     for the CSF model:
-    - sigmaK(): normal force sigma(T) K n delta (used in
-      surfaceTensionForce())
-    - marangoniForce(): tangential (thermocapillary) force
-        F_M = sigmaTemp * (I - n n) & grad(T) * delta
-      evaluated as a face-normal force density so that it can be added to
+    - sigmaK(): sigma(Tmean) K with the mean interface temperature Tmean
+      (used in surfaceTensionForce(), balanced with the pressure gradient)
+    - marangoniForce(): the deviation sigma(T) - sigma(Tmean), normal and tangential
+      (thermocapillary), as the divergence of a surface stress, evaluated
+      as a face-normal force density so that it can be added to
       surfaceTensionForce() in the momentum and pressure equations.
 
 \*---------------------------------------------------------------------------*/
@@ -38,18 +38,31 @@ Description
 #include "interfacePropertiesLS.H"
 #include "fvCFD.H"
 #include "symmTransformField.H"
+#include "linear.H"
+#include "extrapolatedCalculatedFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::scalar Foam::interfacePropertiesLS::interfaceMeanT
+(
+    const volScalarField& T
+) const
+{
+    // Mean temperature on the interface(s), weighted by the delta function
+    const volScalarField& H =
+        params_.densityScaled ? scaledHeaviside_ : Heaviside_;
+    const scalarField w(mag(fvc::grad(H))().primitiveField()*psi_.mesh().V());
+    const scalar sw = gSum(w);
+    return sw > VSMALL ? gSum(w*T.primitiveField())/sw : 0;
+}
+
 
 Foam::tmp<Foam::volScalarField>
 Foam::interfacePropertiesLS::sigmaK() const
 {
-    // Normal surface-tension force with sigma(T). Together with the
-    // tangential Marangoni force (marangoniForce) this is the full
-    // surface force div_s(sigma (I - nn)) = sigma K n + grad_s(sigma);
-    // with a constant sigma in the normal part the integral of the
-    // Marangoni force over a closed interface is not balanced and a drop
-    // in a temperature gradient is driven by a spurious net force.
+    // Surface tension at the mean interface temperature, sigma(Tmean),
+    // balanced with the pressure gradient. The deviation
+    // sigma(T) - sigma(Tmean) is in marangoniForce().
     const volScalarField* TPtr =
         psi_.mesh().findObject<volScalarField>("T");
 
@@ -58,7 +71,9 @@ Foam::interfacePropertiesLS::sigmaK() const
         return sigmaPtr_->sigma()*K_;
     }
 
-    return (sigmaPtr_->sigma() + sigmaTemp_*(*TPtr - TRef_))*K_;
+    const dimensionedScalar Tmean(dimTemperature, interfaceMeanT(*TPtr));
+
+    return (sigmaPtr_->sigma() + sigmaTemp_*(Tmean - TRef_))*K_;
 }
 
 
@@ -94,24 +109,58 @@ Foam::interfacePropertiesLS::marangoniForce() const
 
     const volScalarField& T = *TPtr;
 
-    // Tangential projection of grad(T) at cell centres
-    const volVectorField gradT(fvc::grad(T));
-    const volVectorField projectedGradT((I - sqr(nHatv_)) & gradT);
+    // Temperature-dependent part of the surface force in conservative form
+    //     f = div( (sigma(T) - sigma0) (I - n n) delta )
+    //       = (sigma(T) - sigma0) K n delta + grad_s(sigma(T)) delta
+    // with sigma0 = sigma(Tmean) (Tmean: mean interface temperature), so
+    // that sigma(T) - sigma0 = sigmaTemp*(T - Tmean). The constant part
+    // sigma0 K n delta is in surfaceTensionForce() (balanced with the
+    // pressure gradient); choosing sigma0 at the interface keeps the part
+    // that is not balanced small. Written as the divergence
+    // of a surface stress that vanishes away from the interface, the
+    // discrete net force over a closed interface is zero (as it is for the
+    // exact solution); a separate normal and tangential discretisation
+    // left a spurious net force that drives drops in a temperature
+    // gradient. delta = |grad(H)| (|grad(scaled H)| for the density-scaled
+    // model), consistent with surfaceTensionForce().
+    const volScalarField& H =
+        params_.densityScaled ? scaledHeaviside_ : Heaviside_;
 
-    // Face-normal component
-    const surfaceScalarField pgtf
+    const volScalarField deltaC(mag(fvc::grad(H)));
+
+    const volSymmTensorField stress
     (
-        fvc::interpolate(projectedGradT) & (mesh.Sf()/mesh.magSf())
+        IOobject
+        (
+            "marangoniStress",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        sigmaTemp_*(T - dimensionedScalar(dimTemperature, interfaceMeanT(T)))
+       *deltaC*(symmTensor::I - sqr(nHatv_))
     );
 
-    if (params_.densityScaled)
-    {
-        maf = sigmaTemp_*pgtf*scaledDeltaFace_;
-    }
-    else
-    {
-        maf = sigmaTemp_*pgtf*DeltaFace_;
-    }
+    // Gauss divergence with linear face interpolation (independent of the
+    // schemes in fvSchemes)
+    const volVectorField f
+    (
+        IOobject
+        (
+            "marangoniForceDensity",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        fvc::surfaceIntegrate(mesh.Sf() & linearInterpolate(stress)),
+        extrapolatedCalculatedFvPatchVectorField::typeName
+    );
+
+    maf = linearInterpolate(f) & (mesh.Sf()/mesh.magSf());
 
     return tmaf;
 }
