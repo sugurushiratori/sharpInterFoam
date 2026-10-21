@@ -161,6 +161,10 @@ private:
         ) const;
 
         
+        //- Copy the contact-angle boundary conditions of alpha1 to vf
+        //  (without the alpha limiter)
+        void copyContactAngleBCs(volScalarField& vf);
+
         //- initialize Level-Set function
         void initializePsi();
 

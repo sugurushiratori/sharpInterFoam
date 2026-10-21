@@ -145,6 +145,32 @@ void Foam::interfacePropertiesLS::calculateK()
 
 
 
+void Foam::interfacePropertiesLS::copyContactAngleBCs(volScalarField& vf)
+{
+    forAll(alpha1_.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& apf = alpha1_.boundaryField()[patchi];
+
+        if (isA<alphaContactAngleTwoPhaseFvPatchScalarField>(apf))
+        {
+            OStringStream os;
+            apf.write(os);
+            dictionary dict(IStringStream(os.str())());
+
+            dict.set("limit", word("none"));
+            dict.set("value", scalarField(apf.size(), Zero));
+            dict.remove("gradient");
+
+            vf.boundaryFieldRef().set
+            (
+                patchi,
+                fvPatchScalarField::New(apf.patch(), vf, dict)
+            );
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
 Foam::dimensionedScalar Foam::interfacePropertiesLS::meshSize() const
@@ -552,6 +578,13 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
     
     narrowBand_(psi_)
 {
+    // psi_ and psi0_ were constructed with the patch types of alpha1 only,
+    // so contact-angle patches got default parameters (theta0 = 0) and an
+    // alpha-type limiter. Copy the contact-angle parameters from alpha1 and
+    // disable the limiter (psi is not bounded to [0,1]).
+    copyContactAngleBCs(psi_);
+    copyContactAngleBCs(psi0_);
+
 	Info << "interfacePropertiesLS: meshSize = " << meshSize().value() << endl;
     read();
     calculateK();
