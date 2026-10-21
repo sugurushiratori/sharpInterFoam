@@ -1,0 +1,93 @@
+FoamFile { version 2.0; format ascii; class dictionary; object controlDict; }
+application     none;
+startFrom startTime; startTime 0; stopAt endTime; endTime 0; deltaT 1; writeControl timeStep; writeInterval 1;
+functions
+{
+    checkTranspose
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        name            checkTranspose;
+        codeOptions
+        #{
+            -I$(LIB_SRC)/finiteVolume/lnInclude \
+            -I$(LIB_SRC)/meshTools/lnInclude \
+            -I$(LIB_SRC)/transportModels \
+            -I$(LIB_SRC)/transportModels/incompressible/singlePhaseTransportModel \
+            -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
+            -I$(LIB_SRC)/TurbulenceModels/incompressible/lnInclude
+        #};
+        codeLibs
+        #{
+            -lfiniteVolume -lmeshTools -lincompressibleTransportModels \
+            -lturbulenceModels -lincompressibleTurbulenceModels
+        #};
+        codeInclude
+        #{
+            #include "fvCFD.H"
+            #include "fixedValueFvPatchFields.H"
+            #include "singlePhaseTransportModel.H"
+            #include "turbulentTransportModel.H"
+        #};
+        codeExecute
+        #{
+            const fvMesh& m = mesh();
+            volVectorField U
+            (
+                IOobject("U", m.time().timeName(), m),
+                m, dimensionedVector(dimVelocity, Zero),
+                fixedValueFvPatchVectorField::typeName
+            );
+            // non-symmetric linear field: grad(U) has xy != yx
+            forAll(U, i)
+            {
+                const vector& c = m.C()[i];
+                U[i] = vector(3*c.z() + c.y()*c.x(), 2*c.x() - c.z()*c.z(), 0.5*c.y() + 2*c.x()*c.z());
+            }
+            forAll(U.boundaryField(), patchi)
+            {
+                fvPatchVectorField& pU = U.boundaryFieldRef()[patchi];
+                const vectorField& cf = m.boundary()[patchi].Cf();
+                forAll(pU, facei)
+                {
+                    const vector& c = cf[facei];
+                    pU[facei] = vector(3*c.z() + c.y()*c.x(), 2*c.x() - c.z()*c.z(), 0.5*c.y() + 2*c.x()*c.z());
+                }
+            }
+            const volTensorField gU(fvc::grad(U));
+            const volTensorField Tref(gU.T());              // copy, then transpose
+            const volTensorField Ttmp(Foam::T(fvc::grad(U))); // in-place on tmp
+            const volTensorField Dtmp(dev2(Foam::T(fvc::grad(U))));
+            const volTensorField Dref(dev2(Tref));
+            const scalar e1 = gMax(mag(Ttmp.primitiveField() - Tref.primitiveField()));
+            const scalar e2 = gMax(mag(Dtmp.primitiveField() - Dref.primitiveField()));
+            // Same check through the precompiled turbulence library
+            // (laminar Stokes: divDevReff = -div(nuEff*dev2(T(grad(U)))) - laplacian(nuEff,U))
+            surfaceScalarField phi("phiTest", fvc::flux(U));
+            singlePhaseTransportModel laminarTransport(U, phi);
+            autoPtr<incompressible::turbulenceModel> turb
+            (
+                incompressible::turbulenceModel::New(U, phi, laminarTransport)
+            );
+            const volVectorField rLib("rLib", turb->divDevReff(U) & U);
+            const volScalarField nuEff(turb->nuEff());
+            const volVectorField rRef
+            (
+                "rRef",
+                fvVectorMatrix
+                (
+                  - fvc::div(nuEff*dev2(Tref), "div((nuEff*dev2(T(grad(U)))))")
+                  - fvm::laplacian(nuEff, U)
+                ) & U
+            );
+            const scalar e3 = gMax(mag(rLib.primitiveField() - rRef.primitiveField()));
+            Info<< nl << "=== library check: max|divDevReff(lib)-ref| = " << e3
+                << ", max|ref| = " << gMax(mag(rRef.primitiveField()))
+                << (e3 > 1e-8*gMax(mag(rRef.primitiveField())) ? "  ==> BROKEN" : "  ==> OK") << endl;
+            Info<< nl << "=== transpose check: max|T(tmp)-ref| = " << e1
+                << ", max|dev2(T(tmp))-ref| = " << e2
+                << ", max|ref| = " << gMax(mag(Tref.primitiveField()))
+                << (e1 > 1e-12 ? "  ==> BROKEN" : "  ==> OK") << nl << endl;
+        #};
+    }
+}

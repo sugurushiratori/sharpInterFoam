@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: OpenFOAM v${{ matrix.openfoam }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        openfoam: ["2412", "2512"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenFOAM v${{ matrix.openfoam }} (OpenCFD Debian packages)
+        run: |
+          curl -fsSL https://dl.openfoam.com/add-debian-repo.sh | sudo bash
+          sudo apt-get update
+          sudo apt-get install -y openfoam${{ matrix.openfoam }}-dev
+
+      - name: Build
+        shell: bash
+        run: |
+          source /usr/lib/openfoam/openfoam${{ matrix.openfoam }}/etc/bashrc || true
+          ./Allwmake -j 4 2>&1 | tee log.Allwmake
+          command -v sharpInterFoam && command -v sharpInterThermoFoam
+
+      - name: Regression tests
+        shell: bash
+        run: |
+          source /usr/lib/openfoam/openfoam${{ matrix.openfoam }}/etc/bashrc || true
+          tests/regression/run.sh
+
+      - name: Check of the OpenFOAM build (T(tmp) transpose)
+        if: always()
+        shell: bash
+        run: |
+          source /usr/lib/openfoam/openfoam${{ matrix.openfoam }}/etc/bashrc || true
+          cp -r tests/transposeCheck "$RUNNER_TEMP/transposeCheck"
+          "$RUNNER_TEMP/transposeCheck/Allrun"
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-v${{ matrix.openfoam }}
+          path: |
+            log.Allwmake
+            regression-work/*/log.*
+            regression-work/*/metrics.json
