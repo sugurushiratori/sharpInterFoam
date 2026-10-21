@@ -502,11 +502,11 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
     (
         IOobject
         (
-            "scaledH",
+            "scaledHf",
             alpha1_.time().timeName(),
             alpha1_.mesh(),
             IOobject::NO_READ,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         alpha1_.mesh(),
         dimensionedScalar(dimless, Zero)
