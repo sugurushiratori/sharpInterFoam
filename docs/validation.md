@@ -32,11 +32,23 @@ Pressure error E_p (paper Eq. 49) and maximum spurious velocity after one step.
 
 Axisymmetric (wedge) droplet, Laplace pressure: -0.4 % (N = 20), +0.8 % (N = 40).
 
-## Oscillating droplet (density ratio 1000)
+## Oscillating drop (axisymmetric, mode l = 2)
 
-Zero crossings of the deformation 0.742, 2.222, 3.690, 5.156 with the
-density-scaled CSF; 0.733, 2.196, 3.646, 5.096 with the standard CSF
-(period difference about 1 %).
+`validation/oscillatingDrop`: e = 0.05, density ratio 1000, nu = 0.05,
+zeta = Gamma/omega = 0.07. The viscosity is recovered from the measured
+damping rate and frequency with the finite-viscosity correction (series
+in zeta^(1/2)) and compared with the input value; shape measured by the
+quadrupole moment.
+
+| R/h | omega_d / omega_Lamb | nu recovered (correction) | nu from Lamb (R^2 Gamma/5) |
+|---|---|---|---|
+| 25 | 0.977 | -4.2 % | -16 % |
+| 50 | 0.982 | -14 % | -24 % |
+
+**Open issue:** the damping decreases with mesh refinement, also without
+the density-scaled model (-14 % at R/h = 50) and with a 4 times smaller time
+step at R/h = 25 (no change). The viscous operator itself is correct
+(axisymmetric Poiseuille flow within 0.3 %).
 
 ## Rising bubble (Hysing et al. 2009, test case 1)
 
@@ -82,15 +94,22 @@ investigation.
 
 ## Thermocapillary cavity (paper Sec. 4.3, Table 4)
 
-Wall heights of the interface (normalised by the cavity width) at t = 5.
+Wall heights of the interface (normalised by the cavity width) at t = 5,
+gas density 1e-3 and gas kinematic viscosity equal to the liquid
+(assumed; to be confirmed against the paper's setup).
 
-| Mesh | hot wall | cold wall |
-|---|---|---|
-| Paper (400 x 160) | 0.187 | 0.214 |
-| Sen & Davis (1982) | 0.188 | 0.213 |
-| v2.0, 50 x 20 | 0.1877 (+0.4 %) | 0.2121 (-0.9 %) |
+| Mesh, model | hot wall | cold wall | difference |
+|---|---|---|---|
+| Paper (400 x 160) | 0.187 | 0.214 | 0.027 |
+| Sen & Davis (1982) | 0.188 | 0.213 | 0.025 |
+| 50 x 20, density-scaled CSF, Heaviside density | 0.184 | 0.214 | 0.030 |
+| 100 x 40, density-scaled CSF, Heaviside density | 0.1823 | 0.2184 | 0.036 |
+| 50 x 20, standard CSF, alpha density | 0.1852 | 0.2107 | 0.0255 |
 
-Velocity profile at the cavity centre: surface velocity 0.1167 (Sen & Davis 0.1169).
+**Open issue:** with the density-scaled CSF model the deformation is larger
+than the reference and grows with mesh refinement; with the standard CSF
+the deformation agrees with Sen & Davis. Surface velocity at the cavity
+centre: 0.1167 (Sen & Davis 0.1169).
 
 ## Other checks
 
@@ -100,4 +119,5 @@ Velocity profile at the cavity centre: surface velocity 0.1167 (Sen & Davis 0.11
 | Two-layer heat conduction, conductivity ratio 10 | heat flux error < 1e-10 |
 | Sessile drop, contact angle 60 / 90 deg | 61.3 / 90.3 deg |
 | Moving mesh (moving wall) | volume change 2e-15 |
-| Serial vs 2 processes (thermocapillary cavity) | U difference 3e-10 |
+| Serial vs 2 processes (thermocapillary cavity) | U difference 2e-10 |
+| Axisymmetric Poiseuille flow (wedge, 20 cells) | velocity profile within 0.3 % |
