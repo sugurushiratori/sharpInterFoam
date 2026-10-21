@@ -143,6 +143,14 @@ private:
         
         narrowBand narrowBand_;
 
+        //- Work arrays of godunovDifferences()
+        mutable FixedList<scalarField, 6> godunovG_;
+        mutable boolList godunovMark_;
+
+        //- psi0 divided by the sum of its opposite-sign neighbours
+        //  (forcingTerm; constant during the re-initialisation)
+        scalarField forcingRatio_;
+
         
     // Private Member Functions
         //- No copy construct
@@ -171,22 +179,43 @@ private:
         //- Solve Level-Set re-initialization equation
         void solvePsi();
         
-        tmp<volScalarField> calSignFunc(const volScalarField& psi);
-        
-        void psi_timeAdvanceRK3(volScalarField& psi, const dimensionedScalar& deltaTau);
-        void psi_timeAdvanceRK3B(volScalarField& psi, const dimensionedScalar& deltaTau);
-        
-        tmp<volScalarField> psi_timeStepFunc(const volScalarField& psi);
+        //- Smoothed sign of psi0 (constant during the re-initialisation)
+        tmp<volScalarField> calSignFunc() const;
+
+        //- One RK3 step of the re-initialisation equation
+        //  dpsi/dtau = S(psi0) (1 - |grad(psi)|).
+        //  magGradPsi0: |grad(psi)| of the current psi (already computed
+        //  for the residual)
+        void psi_timeAdvanceRK3
+        (
+            volScalarField& psi,
+            const dimensionedScalar& deltaTau,
+            const volScalarField& signPsi0,
+            const volScalarField& magGradPsi0
+        );
+
+        //- One RK3 step of the interface-position correction
+        //  dpsi/dtau = F/2 (forcingTerm)
+        void psi_timeAdvanceRK3B
+        (
+            volScalarField& psi,
+            const dimensionedScalar& deltaTau
+        );
+
+        tmp<volScalarField> psi_timeStepFunc
+        (
+            const volScalarField& signPsi0,
+            const volScalarField& magGradPsi
+        ) const;
+
         tmp<volScalarField> psi_timeStepFunc2(const volScalarField& psi);
         
         
         //- calculate gradPsi with Godunov Hamiltonian scheme
-        tmp<volVectorField> calGradPsi
-        (
-           const volScalarField& signPsi0, 
-           const volScalarField& psi
-        ) const;
-        
+        //- One-sided differences of psi for the Godunov scheme
+        //  (stored in godunovG_: upwind x, y, z, downwind x, y, z)
+        void godunovDifferences(const volScalarField& psi) const;
+
         //- calculate magGradPsi with Godunov Hamiltonian scheme
         tmp<volScalarField> calMagGradPsi
         (

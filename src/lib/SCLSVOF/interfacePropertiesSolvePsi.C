@@ -63,58 +63,34 @@ void Foam::interfacePropertiesLS::initializePsi()
 }
 
 Foam::tmp<volScalarField>
-Foam::interfacePropertiesLS::calSignFunc(const volScalarField& psi)
+Foam::interfacePropertiesLS::calSignFunc() const
 {
-     const fvMesh& mesh  = psi.mesh();
-     tmp<volScalarField> tsignPsi
+     // Smoothed sign of psi0: S = psi0/sqrt(psi0^2 + eps^2).
+     // Evaluated in all cells (only band cells are used), so that it can be
+     // computed once per re-initialisation although the band changes.
+     const scalar eps = widthEpsilon().value();
+
+     auto tsignPsi = tmp<volScalarField>::New
      (
-        new volScalarField
-        (
-          IOobject
-          (
-              "signPsi",
-              psi.time().timeName(),
-              mesh
-          ),
-          mesh,
-          dimensionedScalar("signPsi", dimVelocity, scalar(0)),
-          zeroGradientFvPatchField<scalar>::typeName
-        )
+         IOobject
+         (
+             "signPsi",
+             psi0_.time().timeName(),
+             psi0_.mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE,
+             IOobject::NO_REGISTER
+         ),
+         psi0_.mesh(),
+         dimensionedScalar(dimVelocity, Zero),
+         zeroGradientFvPatchField<scalar>::typeName
      );
      volScalarField& signPsi = tsignPsi.ref();
 
-     const scalar eps = widthEpsilon().value();
-     const scalar pi  = Foam::constant::mathematical::pi;
-     
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
-     {
-         const label cid = *iter;
-         signPsi[cid] = psi0_[cid] / sqrt( sqr(psi0_[cid]) + sqr(eps) );
-     }
-     
-/*
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
-     {
-         const label ci = *iter;
-         if     (psi0_[ci] < -eps) signPsi[ci] = scalar(-1);
-         else if(psi0_[ci] >  eps) signPsi[ci] = scalar( 1);
-         else                      signPsi[ci] = psi0_[ci] / eps + sin(pi * psi0_[ci] / eps) / pi;
-     }
-
-     const volScalarField gg = mag(fvc::grad(psi));
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
-     {
-         const label ci = *iter;
-         const scalar alp = max(scalar(1), gg[ci]);
-
-         if     (psi[ci] < -alp*eps) signPsi[ci] = scalar(-1);
-         else if(psi[ci] >  alp*eps) signPsi[ci] = scalar( 1);
-         else                        signPsi[ci] = psi[ci] / (alp*eps) + sin(pi * psi[ci] / (alp*eps)) / pi;
-     }
-*/
-
+     const scalarField& p0 = psi0_.primitiveField();
+     signPsi.primitiveFieldRef() = p0/sqrt(sqr(p0) + sqr(eps));
      signPsi.correctBoundaryConditions();
-     
+
      return tsignPsi;
 }
 
@@ -189,17 +165,22 @@ Foam::interfacePropertiesLS::forcingTerm(const volScalarField& psi)
      scalarField sum(mesh.nCells());
      labelList cnt(mesh.nCells());
 
-     // Ratio of psi0 to the sum of its opposite-sign neighbours
-     // (kept fixed during the re-initialisation)
-     oppositeSignSum(psi0_, sum, cnt);
-     scalarField rr(psi0_.primitiveField());
-     for (const label cid : narrowBand_.C3())
+     // Ratio of psi0 to the sum of its opposite-sign neighbours: constant
+     // during the re-initialisation, computed once per solvePsi()
+     // (forcingRatio_ is emptied there)
+     if (forcingRatio_.size() != mesh.nCells())
      {
-         if (cnt[cid] == 0)
-             rr[cid] = 0;
-         else
-             rr[cid] /= sum[cid] + VSMALL;
+         oppositeSignSum(psi0_, sum, cnt);
+         forcingRatio_ = psi0_.primitiveField();
+         forAll(forcingRatio_, cid)
+         {
+             if (cnt[cid] == 0)
+                 forcingRatio_[cid] = 0;
+             else
+                 forcingRatio_[cid] /= sum[cid] + VSMALL;
+         }
      }
+     const scalarField& rr = forcingRatio_;
 
      const dimensionedScalar eps = widthEpsilon();
 
@@ -217,16 +198,26 @@ Foam::interfacePropertiesLS::forcingTerm(const volScalarField& psi)
      return tFF;
 }
 
-void Foam::interfacePropertiesLS::psi_timeAdvanceRK3(volScalarField& psi, const dimensionedScalar& deltaTau)
+void Foam::interfacePropertiesLS::psi_timeAdvanceRK3
+(
+    volScalarField& psi,
+    const dimensionedScalar& deltaTau,
+    const volScalarField& signPsi0,
+    const volScalarField& magGradPsi0
+)
 {
-     volScalarField psi1 = psi + deltaTau * psi_timeStepFunc(psi);
-     volScalarField psi2 = 3.0/4.0 * psi + 1.0/4.0 * psi1 + 1.0/4.0*deltaTau * psi_timeStepFunc(psi1);
-     volScalarField psi3 = 1.0/3.0 * psi + 2.0/3.0 * psi2 + 2.0/3.0*deltaTau * psi_timeStepFunc(psi2);
-     
+     volScalarField psi1 = psi + deltaTau * psi_timeStepFunc(signPsi0, magGradPsi0);
+     volScalarField psi2 = 3.0/4.0 * psi + 1.0/4.0 * psi1 + 1.0/4.0*deltaTau * psi_timeStepFunc(signPsi0, calMagGradPsi(signPsi0, psi1));
+     volScalarField psi3 = 1.0/3.0 * psi + 2.0/3.0 * psi2 + 2.0/3.0*deltaTau * psi_timeStepFunc(signPsi0, calMagGradPsi(signPsi0, psi2));
+
      psi = psi3;
 }
 
-void Foam::interfacePropertiesLS::psi_timeAdvanceRK3B(volScalarField& psi, const dimensionedScalar& deltaTau)
+void Foam::interfacePropertiesLS::psi_timeAdvanceRK3B
+(
+    volScalarField& psi,
+    const dimensionedScalar& deltaTau
+)
 {
      volScalarField psi1 = psi + deltaTau * psi_timeStepFunc2(psi);
      volScalarField psi2 = 3.0/4.0 * psi + 1.0/4.0 * psi1 + 1.0/4.0*deltaTau * psi_timeStepFunc2(psi1);
@@ -236,37 +227,35 @@ void Foam::interfacePropertiesLS::psi_timeAdvanceRK3B(volScalarField& psi, const
 }
 
 Foam::tmp<volScalarField>
-Foam::interfacePropertiesLS::psi_timeStepFunc(const volScalarField& psi)
+Foam::interfacePropertiesLS::psi_timeStepFunc
+(
+    const volScalarField& signPsi0,
+    const volScalarField& magGradPsi
+) const
 {
-     const fvMesh& mesh  = psi.mesh();
-     tmp<volScalarField> tpsiDt
+     auto tpsiDt = tmp<volScalarField>::New
      (
-        new volScalarField
-        (
-          IOobject
-          (
-              "psiDt",
-              psi.time().timeName(),
-              mesh
-          ),
-          mesh,
-          dimensionedScalar("psiDt", dimVelocity, scalar(0)),
-          zeroGradientFvPatchField<scalar>::typeName
-        )
-     );     
+         IOobject
+         (
+             "psiDt",
+             psi_.time().timeName(),
+             psi_.mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE,
+             IOobject::NO_REGISTER
+         ),
+         psi_.mesh(),
+         dimensionedScalar(dimVelocity, Zero),
+         zeroGradientFvPatchField<scalar>::typeName
+     );
      volScalarField& psiDt = tpsiDt.ref();
-     
-     
-     volScalarField signFunc = calSignFunc(psi);
-     volScalarField magGradPsi = calMagGradPsi(signFunc, psi);
 
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
+     for (const label cid : narrowBand_.C3())
      {
-          const label cid = *iter;
-          psiDt[cid] =  signFunc[cid] * ( scalar(1) - magGradPsi[cid]);
+          psiDt[cid] = signPsi0[cid]*(scalar(1) - magGradPsi[cid]);
      }
      psiDt.correctBoundaryConditions();
-     
+
      return tpsiDt;
 }
 
@@ -313,26 +302,29 @@ void Foam::interfacePropertiesLS::solvePsi()
      dimensionedScalar deltaTau( "deltaTau", dimTime, scalar( meshSize().value() / nsub) );
      const label numLoop = label(widthFactor() * nsub * params_.factorNumLoop);
 
+     // Constant during the re-initialisation
+     const tmp<volScalarField> tsignPsi0 = calSignFunc();
+     const volScalarField& signPsi0 = tsignPsi0();
+     forcingRatio_.clear();
+
      label corr = 0;
      for(corr = 0; corr < numLoop; corr++)
      {
-          tmp<volScalarField> signPsi0 = calSignFunc(psi_);          
-          tmp<volScalarField> magGradPsi = calMagGradPsi(signPsi0, psi_);
-          
+          // |grad(psi)| of the current psi: residual and first RK stage
+          const tmp<volScalarField> magGradPsi = calMagGradPsi(signPsi0, psi_);
+
           resid = calResidualMagGradPsi(magGradPsi);
           if(corr == 0) resid0 = resid;
-          
+
           if(resid / resid0 <  params_.tolMagGradPsi )
           {
                Info << " -- converged " ;
                break;
           }
-          
-//          Info << " (iter = " << corr << ", resid = " << resid << ")" << endl;
 
-          psi_timeAdvanceRK3(psi_, deltaTau);
+          psi_timeAdvanceRK3(psi_, deltaTau, signPsi0, magGradPsi());
           psi_timeAdvanceRK3B(psi_, deltaTau);
-          
+
           narrowBand_.update(widthEpsilon().value());
      }
 
