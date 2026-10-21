@@ -1,0 +1,78 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     sharpInterFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         9;              // about 4 periods
+deltaT          1e-4;
+
+writeControl    adjustableRunTime;
+writeInterval   1;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  10;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+maxCo           0.25;
+maxAlphaCo      0.25;
+maxCapillaryNo  1;
+maxDeltaT       1e-2;
+
+functions
+{
+    // Drop extent along the axis (a_z) and in the symmetry plane (a_r),
+    // from the alpha integral along the first cell column / row
+    // -> postProcessing/shape.dat
+    shape
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        name            dropShape;
+        writeControl    timeStep;
+        codeInclude     #{ #include "fvCFD.H" #};
+        codeData        #{ autoPtr<OFstream> osPtr; #};
+        codeWrite
+        #{
+            const fvMesh& m = mesh();
+            const volScalarField& alpha = m.lookupObject<volScalarField>("alpha.water");
+            // uniform mesh: h = axial spacing of the cell centres
+            scalar h = GREAT;
+            forAll(m.C(), i)
+            {
+                const scalar dz = mag(m.C()[i].z() - m.C()[0].z());
+                if (dz > SMALL) h = min(h, dz);
+            }
+            scalar az = 0, ar = 0;
+            forAll(alpha, i)
+            {
+                const vector& c = m.C()[i];
+                if (c.x() < h) az += alpha[i]*h;    // first column: axis
+                if (c.z() < h) ar += alpha[i]*h;    // first row: equator
+            }
+            reduce(az, sumOp<scalar>());
+            reduce(ar, sumOp<scalar>());
+            if (Pstream::master())
+            {
+                if (!osPtr)
+                {
+                    mkDir(m.time().globalPath()/"postProcessing");
+                    osPtr.reset(new OFstream(m.time().globalPath()/"postProcessing"/"shape.dat"));
+                    osPtr() << "# t a_z a_r" << nl;
+                }
+                osPtr() << m.time().value() << ' ' << az << ' ' << ar << endl;
+            }
+        #};
+    }
+}
