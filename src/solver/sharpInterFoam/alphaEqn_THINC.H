@@ -28,8 +28,9 @@
     
     surfaceScalarField alphaPhi = Hflux / deltaT;
 
-    const volScalarField& alpha0 = alpha1.oldTime();
-    alpha1 == alpha0 - fvc::div(Hflux);
+    // alpha1 holds the old-time value here, scaled by Vsc0/Vsc on moving
+    // meshes (ALE: alpha^{n+1} V^{n+1} = alpha^n V^n - sum F)
+    alpha1.ref() = alpha1() - fvc::div(Hflux)().internalField();
     
     alpha1.correctBoundaryConditions();
 
