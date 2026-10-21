@@ -181,7 +181,7 @@ Foam::dimensionedScalar Foam::interfacePropertiesLS::meshSize() const
     // non-solved direction is unrelated to the resolution, so the mesh size
     // is taken from the area of the empty/wedge faces instead of the cell
     // volume.
-    if (mesh.nSolutionD() < 3)
+    if (mesh.nGeometricD() < 3)
     {
         scalar sumA = 0;
         label nFaces = 0;
