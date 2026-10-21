@@ -32,9 +32,9 @@ Description
        passes of a weighted average over the cell and
        its face neighbours (weights 1 + cos(pi psi/eps)), which suppresses
        the cell-to-cell noise of the curvature of the cut cells.
-    2. The curvature is projected to the nearest interface point
-       x - psi n with a first-order Taylor expansion,
-           K(x_Gamma) = K - psi n & grad(K).
+    No projection to the nearest interface point (K - psi n.grad(K)) is
+    applied: grad(K) is unreliable in cells next to walls and band edges,
+    and in the Marangoni cavity it made the interface relax back to flat.
 
     The evaluation is local (no iteration), independent of the length scale
     and of the domain decomposition (coupled patches are included).
@@ -129,8 +129,7 @@ void Foam::interfacePropertiesLS::curvatureInterpolation()
 
         for (const label celli : narrowBand_.C3())
         {
-            // includes band cells with |psi| >= eps next to weighted cells,
-            // which improves grad(K) used in the projection below
+            // includes band cells with |psi| >= eps next to weighted cells
             if (den[celli] > SMALL)
             {
                 Kref[celli] = num[celli]/den[celli];
@@ -138,18 +137,6 @@ void Foam::interfacePropertiesLS::curvatureInterpolation()
         }
     }
 
-    K_.correctBoundaryConditions();
-
-    // 2. Projection to the nearest interface point
-    const volVectorField gradK(fvc::grad(K_));
-    scalarField Kproj(K_.primitiveField());
-
-    for (const label celli : narrowBand_.C3())
-    {
-        Kproj[celli] -= psi_[celli]*(nHatv_[celli] & gradK[celli]);
-    }
-
-    K_.primitiveFieldRef() = Kproj;
     K_.correctBoundaryConditions();
 }
 

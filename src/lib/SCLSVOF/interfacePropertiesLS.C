@@ -140,6 +140,7 @@ void Foam::interfacePropertiesLS::calculateK()
      
      // Simple expression for curvature
      K_ = -fvc::div(nHatf_);
+     K_.correctBoundaryConditions();
 
 }
 
@@ -463,7 +464,11 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
             IOobject::AUTO_WRITE
         ),
         alpha1_.mesh(),
-        dimensionedScalar(dimless/dimLength, Zero)
+        dimensionedScalar(dimless/dimLength, Zero),
+        // zeroGradient on physical boundaries (constraint/coupled patches
+        // keep their own types), so that boundary values follow the
+        // smoothed cell values in curvatureInterpolation()
+        zeroGradientFvPatchScalarField::typeName
     ),
     
     psi_
