@@ -28,12 +28,12 @@ solvers
         {
             correctPsi      yes;
             widthFactor     1.5;
-            densityScaled   yes;
+            densityScaled   no;     // thermocapillary flow: standard CSF (see README)
             initializeAtanh yes;
             denomDeltaTau   10.0;
             factorNumLoop   1.0;
             tolMagGradPsi   1e-8;
-	    densityFunctionHeaviside   yes;
+	    densityFunctionHeaviside   no;
         }
         THINC
         {

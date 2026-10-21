@@ -132,6 +132,16 @@ maxCapillaryNo  1;               // dt <= maxCapillaryNo * sqrt((rho1 + rho2) h^
 * `adjustTimeStep yes` with `maxCapillaryNo` of 1 or less.
 * `interpolationSchemes { default linear; }`; `pointLinear` gives larger spurious currents.
 * Many `nOuterCorrectors` with `residualControl` multiply the cost of the level-set re-initialisation; start with one or a few outer correctors.
+* Choice of the surface-tension model (`densityScaled`, `densityFunctionHeaviside`):
+  * Flows governed by surface tension or Marangoni stresses (capillary
+    oscillations, thermocapillary flows): `densityScaled no;` and
+    `densityFunctionHeaviside no;`. In the thermocapillary cavity this gives
+    the deformation of Sen & Davis, whereas the density-scaled model
+    over-predicts it (see [docs/validation.md](docs/validation.md)).
+  * Large density ratios with dominant inertia or buoyancy (rising bubbles,
+    translating drops): `densityScaled yes;` with `densityFunctionHeaviside yes;`
+    keeps the mass and momentum transport consistent.
+  * In doubt, compare both settings for your problem.
 
 ## Tests and validation
 
@@ -145,6 +155,15 @@ maxCapillaryNo  1;               // dt <= maxCapillaryNo * sqrt((rho1 + rho2) h^
   (observed with the conda-forge OpenFOAM v2412, gcc 13). The laminar viscous
   stress of 3D cases and of 2D cases in the x-z plane is then wrong in every
   OpenFOAM solver. Run `tests/transposeCheck/Allrun` to check your installation.
+* Accuracy limits found in the validation ([docs/validation.md](docs/validation.md)),
+  not yet resolved:
+  * the viscous damping of capillary oscillations decreases with mesh
+    refinement (axisymmetric drop: viscosity recovered from the damping
+    -4 % at R/h = 25, -14 % at R/h = 50);
+  * with the density-scaled model the thermocapillary deformation is too
+    large and grows with mesh refinement;
+  * thermocapillary migration of a drop is about 9 % faster than the
+    Young-Goldstein-Block velocity.
 
 ## Changes from the paper version
 

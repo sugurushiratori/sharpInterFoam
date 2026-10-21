@@ -119,6 +119,14 @@ maxCapillaryNo  1;               // dt <= maxCapillaryNo * sqrt((rho1 + rho2) h^
 * `adjustTimeStep yes` とし、`maxCapillaryNo` は 1 以下。
 * `interpolationSchemes { default linear; }`。`pointLinear` ではスプリアス流れが大きくなります。
 * `nOuterCorrectors` を大きくして `residualControl` で打ち切ると、レベルセット再初期化の計算量が外部反復の回数倍になります。まずは 1〜数回で試してください。
+* 表面張力モデル（`densityScaled`, `densityFunctionHeaviside`）の選び方：
+  * 表面張力やマランゴニ応力が支配的な流れ（毛管振動、熱毛管流）：
+    `densityScaled no;`、`densityFunctionHeaviside no;`。熱毛管キャビティでは、
+    この設定で Sen & Davis の変形量と一致し、density-scaled モデルでは変形が
+    過大になります（[docs/ja/validation.md](docs/ja/validation.md)）。
+  * 密度比が大きく慣性や浮力が支配的な流れ（上昇気泡、並進液滴）：
+    `densityScaled yes;`、`densityFunctionHeaviside yes;` で質量と運動量の輸送が整合します。
+  * 判断がつかない場合は、両方の設定で比較してください。
 
 ## テストと検証
 
@@ -132,6 +140,12 @@ maxCapillaryNo  1;               // dt <= maxCapillaryNo * sqrt((rho1 + rho2) h^
   （conda-forge 版 OpenFOAM v2412, gcc 13 で確認）。この場合、3 次元計算と
   x-z 面の 2 次元計算では、どの OpenFOAM ソルバーでも層流の粘性応力が誤ります。
   お使いの環境は `tests/transposeCheck/Allrun` で確認できます。
+* 検証で見つかった精度の限界（未解決、[docs/ja/validation.md](docs/ja/validation.md)）：
+  * 毛管振動の粘性減衰が、格子を細かくすると小さくなる（軸対称液滴：減衰から
+    逆算した粘性が R/h = 25 で -4 %、R/h = 50 で -14 %）。
+  * density-scaled モデルでは熱毛管による変形が過大で、格子を細かくすると
+    さらに大きくなる。
+  * 液滴の熱毛管泳動速度が Young-Goldstein-Block の値より約 9 % 速い。
 
 ## 論文版からの変更
 
