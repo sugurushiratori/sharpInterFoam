@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the article below."
+title: "sharpInterFoam"
+type: software
+license: GPL-3.0-or-later
+repository-code: "https://github.com/sugurushiratori/sharpInterFoam"
+authors:
+  - family-names: Shiratori
+    given-names: Suguru
+    affiliation: "Tokyo City University"
+preferred-citation:
+  type: article
+  title: "Efficient Implementation of Two-Phase Flow Solver Based on THINC/SW and S-CLSVOF on Unstructured Meshes"
+  authors:
+    - family-names: Shiratori
+      given-names: Suguru
+    - family-names: Usui
+      given-names: Takuro
+    - family-names: Koyama
+      given-names: Shiho
+    - family-names: Ozawa
+      given-names: Shumpei
+    - family-names: Nagano
+      given-names: Hideaki
+    - family-names: Shimano
+      given-names: Kenjiro
+  journal: "International Journal of Microgravity Science and Application"
+  volume: 38
+  issue: 3
+  start: 380301
+  year: 2021
+  doi: "10.15011/jasma.38.380301"
