@@ -9,6 +9,17 @@
         fvOptions(rho, U)
     );
 
+    // With the Heaviside-based density (densityFunctionHeaviside yes) rho is
+    // not transported by rhoPhi, so ddt(rho) + div(rhoPhi) != 0. Remove this
+    // continuity error from the momentum equation (non-conservative,
+    // advective form) to keep momentum transport consistent; otherwise a
+    // drop translating at uniform velocity is strongly disturbed at large
+    // density ratios.
+    if (mixture.densityFunctionHeaviside())
+    {
+        UEqn -= fvm::Sp(fvc::ddt(rho) + fvc::div(rhoPhi), U);
+    }
+
     UEqn.relax();
 
     fvOptions.constrain(UEqn);
