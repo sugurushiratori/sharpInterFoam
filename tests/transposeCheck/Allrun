@@ -1,0 +1,8 @@
+#!/bin/sh
+# Check whether Foam::T() on a tmp tensor field gives correct results with
+# this OpenFOAM build. Usage: ./Allrun   (OpenFOAM environment loaded)
+cd "${0%/*}" || exit 1
+mkdir -p 0
+blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed"; exit 1; }
+postProcess -time 0 > log.check 2>&1
+grep "check:" log.check || { echo "check failed, see log.check"; tail -20 log.check; }

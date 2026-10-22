@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::THINC
@@ -101,7 +102,29 @@ class THINC
             const scalar& dt,
             const scalar& dx
         ) const;
-        
+
+        //- flux1D evaluated in the orientation of the upwind cell
+        //  (phif >= 0), so that the flux through a processor face is
+        //  computed bitwise identically on both sides
+        scalar orientedFlux1D
+        (
+            const scalar fP,
+            const scalar fN,
+            const scalar normal,
+            const scalar beta,
+            const scalar phif,
+            const scalar dt,
+            const scalar dx
+        ) const
+        {
+            return
+            (
+                phif >= 0
+              ?  flux1D(fP, fN,  normal, beta,  phif, dt, dx)
+              : -flux1D(fN, fP, -normal, beta, -phif, dt, dx)
+            );
+        }
+
 public:
 
     // Constructors

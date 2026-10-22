@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# regression test runs
+regression-work/
+__pycache__/

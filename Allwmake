@@ -1,0 +1,13 @@
+#!/bin/sh
+cd "${0%/*}" || exit                                # Run from this directory
+#------------------------------------------------------------------------------
+# Build the libraries and solvers of sharpInterFoam
+#   ./Allwmake          build
+#   ./Allwmake -j       parallel build (wmake option)
+#------------------------------------------------------------------------------
+
+set -e
+wmake "$@" libso src/lib/THINC
+wmake "$@" libso src/lib/SCLSVOF
+wmake "$@" src/solver/sharpInterFoam
+wmake "$@" src/solver/sharpInterThermoFoam

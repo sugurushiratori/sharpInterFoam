@@ -1,0 +1,9 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+runApplication blockMesh
+cp 0/alpha.water.orig 0/alpha.water
+runApplication setFields
+runApplication postProcess -func writeCellVolumes -time 0
+runApplication $(getApplication)
+runApplication -s V postProcess -func writeCellVolumes -latestTime

@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::interfacePropertiesLS
@@ -109,6 +110,13 @@ private:
         //- Surface tension
         autoPtr<surfaceTensionModel> sigmaPtr_;
 
+        //- Temperature coefficient of the surface tension, d(sigma)/dT
+        //  (Marangoni effect; zero for isothermal problems)
+        dimensionedScalar sigmaTemp_;
+
+        //- Reference temperature of sigma: sigma(T) = sigma + sigmaTemp*(T - TRef)
+        dimensionedScalar TRef_;
+
         //- Stabilisation for normalisation of the interface normal
         const dimensionedScalar deltaN_;
 
@@ -139,6 +147,14 @@ private:
         
         narrowBand narrowBand_;
 
+        //- Work arrays of godunovDifferences()
+        mutable FixedList<scalarField, 6> godunovG_;
+        mutable boolList godunovMark_;
+
+        //- psi0 divided by the sum of its opposite-sign neighbours
+        //  (forcingTerm; constant during the re-initialisation)
+        scalarField forcingRatio_;
+
         
     // Private Member Functions
         //- No copy construct
@@ -157,30 +173,53 @@ private:
         ) const;
 
         
+        //- Copy the contact-angle boundary conditions of alpha1 to vf
+        //  (without the alpha limiter)
+        void copyContactAngleBCs(volScalarField& vf);
+
         //- initialize Level-Set function
         void initializePsi();
 
         //- Solve Level-Set re-initialization equation
         void solvePsi();
         
-        tmp<volScalarField> calSignFunc(const volScalarField& psi);
-        
-        void psi_timeAdvanceRK3(volScalarField& psi, const dimensionedScalar& deltaTau);
-        void psi_timeAdvanceRK3B(volScalarField& psi, const dimensionedScalar& deltaTau);
-        
-        tmp<volScalarField> psi_timeStepFunc(const volScalarField& psi);
+        //- Smoothed sign of psi0 (constant during the re-initialisation)
+        tmp<volScalarField> calSignFunc() const;
+
+        //- One RK3 step of the re-initialisation equation
+        //  dpsi/dtau = S(psi0) (1 - |grad(psi)|).
+        //  magGradPsi0: |grad(psi)| of the current psi (already computed
+        //  for the residual)
+        void psi_timeAdvanceRK3
+        (
+            volScalarField& psi,
+            const dimensionedScalar& deltaTau,
+            const volScalarField& signPsi0,
+            const volScalarField& magGradPsi0
+        );
+
+        //- One RK3 step of the interface-position correction
+        //  dpsi/dtau = F/2 (forcingTerm)
+        void psi_timeAdvanceRK3B
+        (
+            volScalarField& psi,
+            const dimensionedScalar& deltaTau
+        );
+
+        tmp<volScalarField> psi_timeStepFunc
+        (
+            const volScalarField& signPsi0,
+            const volScalarField& magGradPsi
+        ) const;
+
         tmp<volScalarField> psi_timeStepFunc2(const volScalarField& psi);
         
-        void K_timeAdvanceRK3(volScalarField& K, const dimensionedScalar& deltaTau);
-        tmp<volScalarField> K_timeStepFunc(const volScalarField& K);
         
         //- calculate gradPsi with Godunov Hamiltonian scheme
-        tmp<volVectorField> calGradPsi
-        (
-           const volScalarField& signPsi0, 
-           const volScalarField& psi
-        ) const;
-        
+        //- One-sided differences of psi for the Godunov scheme
+        //  (stored in godunovG_: upwind x, y, z, downwind x, y, z)
+        void godunovDifferences(const volScalarField& psi) const;
+
         //- calculate magGradPsi with Godunov Hamiltonian scheme
         tmp<volScalarField> calMagGradPsi
         (
@@ -280,10 +319,19 @@ public:
             return psi_;
         }
 
-        tmp<volScalarField> sigmaK() const
+        //- Surface tension coefficient field
+        tmp<volScalarField> sigma() const
         {
-            return sigmaPtr_->sigma()*K_;
+            return sigmaPtr_->sigma();
         }
+
+        //- sigma*K with the surface tension at the mean interface
+        //  temperature (the deviation from it is in marangoniForce(), see
+        //  interfacePropertiesMarangoni.C)
+        tmp<volScalarField> sigmaK() const;
+
+        //- Delta-weighted mean temperature on the interface
+        scalar interfaceMeanT(const volScalarField& T) const;
         
         
         //- Heaviside function
@@ -324,6 +372,18 @@ public:
         
         
         tmp<surfaceScalarField> surfaceTensionForce() const;
+
+        //- Temperature coefficient of the surface tension
+        const dimensionedScalar& sigmaTemp() const
+        {
+            return sigmaTemp_;
+        }
+
+        //- Face-normal component of the Marangoni force,
+        //  sigmaTemp*(I - n n)&grad(T)*delta, returned as a face force
+        //  density consistent with surfaceTensionForce().
+        //  Returns zero if no temperature field "T" is registered.
+        tmp<surfaceScalarField> marangoniForce() const;
                 
         //- Indicator of the proximity of the interface
         //  Field values are 1 near and 0 away for the interface.

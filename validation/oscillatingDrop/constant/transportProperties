@@ -1,0 +1,30 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      transportProperties;
+}
+
+// Drop in a light gas, density ratio 1000.
+// Lamb (inviscid, l = 2): omega0^2 = 8 sigma/(rho R^3), damping
+// Gamma = 5 nu/R^2; nu = 0.05: Gamma/omega0 = 0.088 (finite-viscosity
+// correction of the damping, see evaluate.py). With nu = 0.01
+// (Laplace number 1e4) spurious currents mask the damping on fine meshes.
+phases (water air);
+
+water
+{
+    transportModel  Newtonian;
+    nu              0.05;
+    rho             1;
+}
+
+air
+{
+    transportModel  Newtonian;
+    nu              0.05;
+    rho             0.001;
+}
+
+sigma           1;

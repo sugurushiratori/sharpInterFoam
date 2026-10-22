@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::THINC
@@ -98,10 +99,10 @@ Foam::THINC::getFlux
 
         const scalar dx = meshV[ciup] / mesh.magSf()[facei];
 
-        sf[facei] = flux1D(fP, fN, nf, beta, phif, deltaT, dx);
+        sf[facei] = orientedFlux1D(fP, fN, nf, beta, phif, deltaT, dx);
     }
     
-    //- ã´äEèàóù
+    // Boundary faces
     forAll(mesh.boundary(), patchi)
     {
        fvsPatchScalarField& psf      = sf.boundaryFieldRef()[patchi];
@@ -137,7 +138,7 @@ Foam::THINC::getFlux
 //             const scalar dx = 2.0 * mag(cV - ciF);
                const scalar dx = VV / mesh.magSf().boundaryField()[patchi][facei];
 
-               psf[facei] = flux1D(vfP[facei], vfN[facei], nf, beta, phif, deltaT, dx);
+               psf[facei] = orientedFlux1D(vfP[facei], vfN[facei], nf, beta, phif, deltaT, dx);
            }
        }
        else

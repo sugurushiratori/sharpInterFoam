@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -33,172 +34,180 @@ License
 
 
 
-Foam::tmp<Foam::volVectorField>
-Foam::interfacePropertiesLS::calGradPsi(const volScalarField& signPsi0, const volScalarField& psi) const
+void Foam::interfacePropertiesLS::godunovDifferences
+(
+    const volScalarField& psi
+) const
 {
-    // grad(psi)の計算: Godunov's scheme
+    // One-sided (upwind and downwind) differences of psi in the x, y and z
+    // directions, evaluated as Gauss sums over the faces:
+    //     GU_d = (1/V) sum_f Sf_d psi_f(upwind w.r.t. e_d)
+    //     GD_d = (1/V) sum_f Sf_d psi_f(downwind w.r.t. e_d)
+    // This is the same as fvc::div(e_d & Sf * upwind/downwind interpolate)
+    // but uses one loop over the faces without temporary fields.
+    // Values are valid in the band cells C3 only.
 
-     const fvMesh& mesh  = psi_.mesh();
-     
-     tmp<volVectorField> tgradPsi
-     (
-        new volVectorField
-        (
-          IOobject
-          (
-              "gradPsi",
-              psi.time().timeName(),
-              mesh
-          ),
-          mesh,
-          dimensionedVector("gradPsi", psi.dimensions() / dimLength, vector::zero),
-          zeroGradientFvPatchField<vector>::typeName
-        )
-     );     
-     volVectorField& gradPsi = tgradPsi.ref();
-     
-     const surfaceScalarField exf = dimensionedVector("ex", dimless, vector(1, 0, 0)) & mesh.Sf();
-     const surfaceScalarField eyf = dimensionedVector("ey", dimless, vector(0, 1, 0)) & mesh.Sf();
-     const surfaceScalarField ezf = dimensionedVector("ez", dimless, vector(0, 0, 1)) & mesh.Sf();
-     
-     upwind<scalar>   intpUx(mesh, exf),  intpUy(mesh, eyf),  intpUz(mesh, ezf);
-     downwind<scalar> intpDx(mesh, exf),  intpDy(mesh, eyf),  intpDz(mesh, ezf);
-     
-     surfaceScalarField psifUx = intpUx.interpolate(psi);
-     surfaceScalarField psifUy = intpUy.interpolate(psi);
-     surfaceScalarField psifUz = intpUz.interpolate(psi);
-     surfaceScalarField psifDx = intpDx.interpolate(psi);
-     surfaceScalarField psifDy = intpDy.interpolate(psi);
-     surfaceScalarField psifDz = intpDz.interpolate(psi);
+    const fvMesh& mesh = psi.mesh();
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const vectorField& Sf = mesh.Sf().primitiveField();
+    const scalarField& V = mesh.V();
+    const scalarField& psiI = psi.primitiveField();
 
-     const volScalarField GxU = fvc::div(exf*psifUx);
-     const volScalarField GyU = fvc::div(eyf*psifUy);
-     const volScalarField GzU = fvc::div(ezf*psifUz);
-     const volScalarField GxD = fvc::div(exf*psifDx);
-     const volScalarField GyD = fvc::div(eyf*psifDy);
-     const volScalarField GzD = fvc::div(ezf*psifDz);
+    // Only the band cells C3 are needed: faces without a band cell on
+    // either side are skipped
+    const labelList& band = narrowBand_.C3();
+    godunovMark_.setSize(mesh.nCells());
+    godunovMark_ = false;
+    for (const label ci : band)
+    {
+        godunovMark_[ci] = true;
+    }
 
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
-     {
-         const label ci = *iter;
-         const scalar posGxU = max(scalar(0), GxU[ci]);
-         const scalar posGyU = max(scalar(0), GyU[ci]);
-         const scalar posGzU = max(scalar(0), GzU[ci]);
-         const scalar negGxU = min(scalar(0), GxU[ci]);
-         const scalar negGyU = min(scalar(0), GyU[ci]);
-         const scalar negGzU = min(scalar(0), GzU[ci]);
-         
-         const scalar posGxD = max(scalar(0), GxD[ci]);
-         const scalar posGyD = max(scalar(0), GyD[ci]);
-         const scalar posGzD = max(scalar(0), GzD[ci]);
-         const scalar negGxD = min(scalar(0), GxD[ci]);
-         const scalar negGyD = min(scalar(0), GyD[ci]);
-         const scalar negGzD = min(scalar(0), GzD[ci]);
+    for (direction d = 0; d < 6; ++d)
+    {
+        godunovG_[d].setSize(mesh.nCells());
+        for (const label ci : band)
+        {
+            godunovG_[d][ci] = 0;
+        }
+    }
 
-         if(signPsi0[ci] > 0.0)
-         {
-              gradPsi[ci][0] = (mag(posGxU) > mag(negGxD) ? posGxU : negGxD );
-              gradPsi[ci][1] = (mag(posGyU) > mag(negGyD) ? posGyU : negGyD );
-              gradPsi[ci][2] = (mag(posGzU) > mag(negGzD) ? posGzU : negGzD );
-         }
-         else
-         {
-              gradPsi[ci][0] = (mag(posGxD) > mag(negGxU) ? posGxD : negGxU );
-              gradPsi[ci][1] = (mag(posGyD) > mag(negGyU) ? posGyD : negGyU );
-              gradPsi[ci][2] = (mag(posGzD) > mag(negGzU) ? posGzD : negGzU );
-         }
-     }
+    forAll(own, facei)
+    {
+        const label o = own[facei];
+        const label n = nei[facei];
+        if (!godunovMark_[o] && !godunovMark_[n])
+        {
+            continue;
+        }
+        const scalar po = psiI[o];
+        const scalar pn = psiI[n];
 
-     gradPsi.correctBoundaryConditions();
+        for (direction d = 0; d < 3; ++d)
+        {
+            const scalar s = Sf[facei][d];
+            // upwind w.r.t. e_d: owner value for s >= 0
+            const scalar fu = s*(s >= 0 ? po : pn);
+            const scalar fd = s*(s >= 0 ? pn : po);
+            godunovG_[d][o] += fu;
+            godunovG_[d][n] -= fu;
+            godunovG_[d + 3][o] += fd;
+            godunovG_[d + 3][n] -= fd;
+        }
+    }
 
-     return tgradPsi;
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvPatchScalarField& pp = psi.boundaryField()[patchi];
+        if (!pp.size())
+        {
+            continue;
+        }
+        const labelUList& fc = mesh.boundary()[patchi].faceCells();
+        const vectorField& pSf = mesh.Sf().boundaryField()[patchi];
+
+        if (pp.coupled())
+        {
+            const scalarField pI(pp.patchInternalField());
+            const scalarField pN(pp.patchNeighbourField());
+            forAll(fc, i)
+            {
+                if (!godunovMark_[fc[i]]) continue;
+                for (direction d = 0; d < 3; ++d)
+                {
+                    const scalar s = pSf[i][d];
+                    godunovG_[d][fc[i]] += s*(s >= 0 ? pI[i] : pN[i]);
+                    godunovG_[d + 3][fc[i]] += s*(s >= 0 ? pN[i] : pI[i]);
+                }
+            }
+        }
+        else
+        {
+            forAll(fc, i)
+            {
+                if (!godunovMark_[fc[i]]) continue;
+                for (direction d = 0; d < 3; ++d)
+                {
+                    const scalar f = pSf[i][d]*pp[i];
+                    godunovG_[d][fc[i]] += f;
+                    godunovG_[d + 3][fc[i]] += f;
+                }
+            }
+        }
+    }
+
+    for (direction d = 0; d < 6; ++d)
+    {
+        for (const label ci : band)
+        {
+            godunovG_[d][ci] /= V[ci];
+        }
+    }
 }
+
 
 Foam::tmp<Foam::volScalarField>
-Foam::interfacePropertiesLS::calMagGradPsi(const volScalarField& signPsi0, const volScalarField& psi) const
+Foam::interfacePropertiesLS::calMagGradPsi
+(
+    const volScalarField& signPsi0,
+    const volScalarField& psi
+) const
 {
-    // |grad(psi)|の計算: Godunov's scheme
+    // |grad(psi)| with the Godunov Hamiltonian, in the narrow band C3
 
-     const fvMesh& mesh  = psi_.mesh();
-     
-     tmp<volScalarField> tmagGradPsi
-     (
-        new volScalarField
+    const fvMesh& mesh = psi_.mesh();
+
+    auto tmagGradPsi = tmp<volScalarField>::New
+    (
+        IOobject
         (
-          IOobject
-          (
-              "magGradPsi",
-              psi.time().timeName(),
-              mesh
-          ),
-          mesh,
-          dimensionedScalar("magGradPsi", psi.dimensions() / dimLength, scalar(0)),
-          zeroGradientFvPatchField<scalar>::typeName
-        )
-     );     
-     volScalarField& magGradPsi = tmagGradPsi.ref();
-     
-     const surfaceScalarField exf = dimensionedVector("ex", dimless, vector(1, 0, 0)) & mesh.Sf();
-     const surfaceScalarField eyf = dimensionedVector("ey", dimless, vector(0, 1, 0)) & mesh.Sf();
-     const surfaceScalarField ezf = dimensionedVector("ez", dimless, vector(0, 0, 1)) & mesh.Sf();
-     
-     upwind<scalar>   intpUx(mesh, exf),  intpUy(mesh, eyf),  intpUz(mesh, ezf);
-     downwind<scalar> intpDx(mesh, exf),  intpDy(mesh, eyf),  intpDz(mesh, ezf);
-     
-     surfaceScalarField psifUx = intpUx.interpolate(psi);
-     surfaceScalarField psifUy = intpUy.interpolate(psi);
-     surfaceScalarField psifUz = intpUz.interpolate(psi);
-     surfaceScalarField psifDx = intpDx.interpolate(psi);
-     surfaceScalarField psifDy = intpDy.interpolate(psi);
-     surfaceScalarField psifDz = intpDz.interpolate(psi);
+            "magGradPsi",
+            psi.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        mesh,
+        dimensionedScalar(psi.dimensions()/dimLength, Zero),
+        zeroGradientFvPatchField<scalar>::typeName
+    );
+    volScalarField& magGradPsi = tmagGradPsi.ref();
 
-     const volScalarField GxU = fvc::div(exf*psifUx);
-     const volScalarField GyU = fvc::div(eyf*psifUy);
-     const volScalarField GzU = fvc::div(ezf*psifUz);
-     const volScalarField GxD = fvc::div(exf*psifDx);
-     const volScalarField GyD = fvc::div(eyf*psifDy);
-     const volScalarField GzD = fvc::div(ezf*psifDz);
+    godunovDifferences(psi);
 
-     forAllConstIter(labelList, narrowBand_.C3(), iter)
-     {
-         const label ci = *iter;
-         const scalar posGxU = max(scalar(0), GxU[ci]);
-         const scalar posGyU = max(scalar(0), GyU[ci]);
-         const scalar posGzU = max(scalar(0), GzU[ci]);
-         const scalar negGxU = min(scalar(0), GxU[ci]);
-         const scalar negGyU = min(scalar(0), GyU[ci]);
-         const scalar negGzU = min(scalar(0), GzU[ci]);
-         
-         const scalar posGxD = max(scalar(0), GxD[ci]);
-         const scalar posGyD = max(scalar(0), GyD[ci]);
-         const scalar posGzD = max(scalar(0), GzD[ci]);
-         const scalar negGxD = min(scalar(0), GxD[ci]);
-         const scalar negGyD = min(scalar(0), GyD[ci]);
-         const scalar negGzD = min(scalar(0), GzD[ci]);
+    const scalarField& GxU = godunovG_[0];
+    const scalarField& GyU = godunovG_[1];
+    const scalarField& GzU = godunovG_[2];
+    const scalarField& GxD = godunovG_[3];
+    const scalarField& GyD = godunovG_[4];
+    const scalarField& GzD = godunovG_[5];
 
-         if(signPsi0[ci] > 0.0)
-         {
-              const scalar vx = max(sqr(posGxU), sqr(negGxD));
-              const scalar vy = max(sqr(posGyU), sqr(negGyD));
-              const scalar vz = max(sqr(posGzU), sqr(negGzD));
-              
-              magGradPsi[ci] = sqrt(vx + vy + vz);
-         }
-         else
-         {
-              const scalar vx = max(sqr(negGxU), sqr(posGxD));
-              const scalar vy = max(sqr(negGyU), sqr(posGyD));
-              const scalar vz = max(sqr(negGzU), sqr(posGzD));
-              
-              magGradPsi[ci] = sqrt(vx + vy + vz);
-         }
-     }
+    for (const label ci : narrowBand_.C3())
+    {
+        if (signPsi0[ci] > 0.0)
+        {
+            const scalar vx = max(sqr(max(scalar(0), GxU[ci])), sqr(min(scalar(0), GxD[ci])));
+            const scalar vy = max(sqr(max(scalar(0), GyU[ci])), sqr(min(scalar(0), GyD[ci])));
+            const scalar vz = max(sqr(max(scalar(0), GzU[ci])), sqr(min(scalar(0), GzD[ci])));
 
-     magGradPsi.correctBoundaryConditions();
+            magGradPsi[ci] = sqrt(vx + vy + vz);
+        }
+        else
+        {
+            const scalar vx = max(sqr(min(scalar(0), GxU[ci])), sqr(max(scalar(0), GxD[ci])));
+            const scalar vy = max(sqr(min(scalar(0), GyU[ci])), sqr(max(scalar(0), GyD[ci])));
+            const scalar vz = max(sqr(min(scalar(0), GzU[ci])), sqr(max(scalar(0), GzD[ci])));
 
-     return tmagGradPsi;
+            magGradPsi[ci] = sqrt(vx + vy + vz);
+        }
+    }
+
+    magGradPsi.correctBoundaryConditions();
+
+    return tmagGradPsi;
 }
-
 
 
 // ************************************************************************* //

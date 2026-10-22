@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::THINC
@@ -82,12 +83,12 @@ bool Foam::THINC::read()
 
 //---------------------------------------------
 //- THINC core function
-//  fP:      owner側のalpha
-//  fN:      neighbour側のalpha
-//  normal:  法線ベクトルのフェイス射影
-//  phif:    速度のフェイス射影
-//  dt:      時間刻み
-//  dx:      格子幅
+//  fP:      alpha of the upwind-side cell argument
+//  fN:      alpha of the other cell
+//  normal:  face-normal component of the interface normal
+//  phif:    face-normal velocity
+//  dt:      time step
+//  dx:      cell width (V/|Sf| of the upwind cell)
 //---------------------------------------------
 Foam::scalar
 Foam::THINC::flux1D
@@ -111,7 +112,13 @@ Foam::THINC::flux1D
       }
       else
       {
-//         if(betaArg < epsBeta_) return fup * phif * dt;
+         // For beta < epsBeta (interface nearly parallel to the face
+         // direction, |normal| -> 0) the THINC flux evaluated with
+         // beta = epsBeta is blended linearly with the upwind flux.
+         // Without the blending the flux jumps at normal = 0, where gamma
+         // changes sign; normal is round-off noise there (e.g. vertical
+         // faces of a horizontal interface), which made the results
+         // depend on round-off (serial and parallel runs differed).
          const scalar beta  = (betaArg < epsBeta_ ? epsBeta_ : betaArg);
          
          const scalar a1    = ::exp(beta/gamma * (scalar(2) * fup - scalar(1)) );
@@ -120,6 +127,12 @@ Foam::THINC::flux1D
          const scalar a4    = ::cosh(beta*(xface -(phif * dt/dx) -dd));
          const scalar a5    = ::cosh(beta*(xface - dd));
          const scalar flux  = scalar(1)/scalar(2)*( phif * dt -gamma*dx/beta * ::log(a4/a5));
+
+         if (betaArg < epsBeta_)
+         {
+             const scalar w = ::max(betaArg, scalar(0))/epsBeta_;
+             return w*flux + (scalar(1) - w)*fup*phif*dt;
+         }
          return flux;
       }
 }

@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::incompressibleTwoPhaseMixture
@@ -68,6 +69,14 @@ protected:
         
         dimensionedScalar kappa1_;
         dimensionedScalar kappa2_;
+
+        //- Specific heat capacities (optional entry "Cp" in both phase
+        //  dictionaries). If not given, rho*Cp = 1 is assumed in both
+        //  phases, i.e. the energy equation reduces to the original
+        //  diffusivity form with lambda = kappa.
+        bool hasCp_;
+        dimensionedScalar Cp1_;
+        dimensionedScalar Cp2_;
 
         const volVectorField& U_;
         const surfaceScalarField& phi_;
@@ -164,8 +173,18 @@ public:
         tmp<surfaceScalarField> nuf() const;
         
         
-        //- Return the thermal diffusitvity
+        //- Return the thermal diffusivity
         tmp<volScalarField> kappa() const;
+
+        //- Volumetric heat capacity rho*Cp of the mixture
+        tmp<volScalarField> rhoCp() const;
+
+        //- Thermal conductivity lambda = rho*Cp*kappa of the mixture
+        tmp<volScalarField> lambda() const;
+
+        //- Face thermal conductivity, harmonic interpolation of lambda
+        //  (continuity of the heat flux across the interface)
+        tmp<surfaceScalarField> lambdaf() const;
 
         //- Correct the laminar viscosity
         virtual void correct()

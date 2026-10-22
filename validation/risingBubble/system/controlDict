@@ -1,0 +1,72 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     sharpInterFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         3;
+deltaT          1e-4;
+
+writeControl    adjustableRunTime;
+writeInterval   0.5;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  10;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+maxCo           0.25;
+maxAlphaCo      0.25;
+maxCapillaryNo  1;
+maxDeltaT       1e-2;
+
+functions
+{
+    // Bubble (alpha = 0) area, centroid, rise velocity and circularity
+    // (Hysing et al. 2009) every time step -> postProcessing/bubble.dat
+    bubble
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        name            bubbleStatistics;
+        writeControl    timeStep;
+        codeInclude     #{ #include "fvCFD.H" #};
+        codeData        #{ autoPtr<OFstream> osPtr; #};
+        codeWrite
+        #{
+            const fvMesh& m = mesh();
+            const volScalarField& alpha = m.lookupObject<volScalarField>("alpha.water");
+            const volVectorField& U = m.lookupObject<volVectorField>("U");
+            const scalarField& V = m.V();
+            const scalar dz = m.bounds().span().z();
+            const scalarField b(1.0 - alpha.primitiveField());
+            const scalar A = gSum(b*V)/dz;
+            const vector xc = gSum(b*V*m.C().primitiveField())/(A*dz);
+            const vector uc = gSum(b*V*U.primitiveField())/(A*dz);
+            // interface length = integral of |grad(alpha)|
+            const scalar L = gSum(mag(fvc::grad(alpha))().primitiveField()*V)/dz;
+            const scalar circ = 2.0*Foam::sqrt(constant::mathematical::pi*A)/L;
+            if (Pstream::master())
+            {
+                if (!osPtr)
+                {
+                    mkDir(m.time().globalPath()/"postProcessing");
+                    osPtr.reset(new OFstream(m.time().globalPath()/"postProcessing"/"bubble.dat"));
+                    osPtr() << "# t area x_c y_c u_c v_c circularity" << nl;
+                }
+                osPtr() << m.time().value() << ' ' << A << ' ' << xc.x() << ' '
+                    << xc.y() << ' ' << uc.x() << ' ' << uc.y() << ' ' << circ << endl;
+            }
+        #};
+    }
+}

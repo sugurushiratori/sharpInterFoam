@@ -1,0 +1,199 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2006                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "alpha.water.*"
+    {
+        nAlphaCorr      2;
+        nAlphaSubCycles 2;
+        cAlpha          1;
+	icAlpha		0.25;
+       
+        SCLSVOF
+        {
+            correctPsi      yes;
+            widthFactor     1.5;
+            densityScaled   yes;
+            initializeAtanh yes;
+            denomDeltaTau   10.0;
+            factorNumLoop   1.0;
+            tolMagGradPsi   1e-8;
+	    densityFunctionHeaviside   yes;
+        }
+        THINC
+        {
+            enable          yes;
+	    epsAlpha        1e-12;
+	    epsBeta         1e-2;
+        }
+
+        MULESCorr       yes;	// Switches on semi-implicit MULES
+        nLimiterIter    8;
+	alphaApplyPrevCorr	false;
+
+//	$Smooth2;
+	$PBiCG_DILU;
+
+        tolerance       1e-14;
+        relTol          0;
+    }
+
+    "pcorr.*"
+    {
+        solver          PCG;
+        preconditioner
+        {
+            preconditioner  GAMG;
+            tolerance       1e-13;
+            relTol          0;
+            smoother        GaussSeidel;
+        }
+        tolerance       1e-13;
+        relTol          0;
+        maxIter         1000;
+    }
+
+    PCG_FDIC
+    {
+	    solver		PCG;
+	    preconditioner	FDIC;
+            tolerance       1e-12;
+            relTol          0;
+            maxIter         1000;
+    }
+
+    GAMG_GS
+    {
+        solver          GAMG;
+        tolerance       1e-10;
+        relTol          0.0;
+        smoother        GaussSeidel;
+    }
+
+    Coupled
+    {
+	    type		coupled;
+	    solver		PBiCCCG;
+	    preconditioner	DILU;
+	    tolerance		(1e-13 1e-13 1e-13);
+	    relTol		(0 0 0);
+    }
+
+    p_rgh
+    {
+	    $PCG_FDIC;
+//	    $GAMG_GS;
+            tolerance       1e-12;
+            relTol          0;
+    }
+
+    p_rghFinal
+    {
+	    $p_rgh;
+            tolerance       1e-13;
+            relTol          0;
+    }
+
+    T 
+    {
+        solver          PBiCGStab;
+	preconditioner	DILU;
+        tolerance       1e-12;
+        relTol          0;
+    }
+
+    TFinal
+    {
+        $T;
+        tolerance       1e-13;
+        relTol          0;
+    }
+
+    U
+    {
+        solver          PBiCGStab;
+	preconditioner	DILU;
+        tolerance       1e-13;
+        relTol          0;
+    }
+
+    UFinal
+    {
+        $U;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor	yes;
+
+    nCorrectors     2;
+    nNonOrthogonalCorrectors 0;
+    nOuterCorrectors	20;
+
+    consistent		yes;
+
+    residualControl
+    {
+	    p_rgh
+	    {
+		    relTol	0.0;
+		    tolerance	1e-2;
+	    }
+
+	    U
+	    {
+		    relTol	0.0;
+		    tolerance	1e-3;
+	    }
+	    T 
+	    {
+		    relTol	0.0;
+		    tolerance	1e-3;
+	    }
+
+/*
+	    "alpha.*"
+	    {
+		    relTol	0.0;
+		    tolerance	1e-3;
+	    }
+*/
+    }
+
+    pRefPoint	(0 0 0);
+    pRefValue	0.0;
+    
+}
+
+relaxationFactors
+{
+    equations
+    {
+        U           0.7;
+        T           1.0;
+	"(U|T)Final"	1.0;
+    }
+    fields
+    {
+	    p_rgh	0.3;
+    }
+}
+
+// ************************************************************************* //

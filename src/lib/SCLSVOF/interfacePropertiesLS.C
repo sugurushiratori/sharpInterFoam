@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -33,6 +34,8 @@ License
 #include "upwind.H"
 #include "downwind.H"
 #include "unitConversion.H"
+#include "emptyPolyPatch.H"
+#include "wedgePolyPatch.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -138,17 +141,73 @@ void Foam::interfacePropertiesLS::calculateK()
      
      // Simple expression for curvature
      K_ = -fvc::div(nHatf_);
+     K_.correctBoundaryConditions();
 
 }
 
+
+
+void Foam::interfacePropertiesLS::copyContactAngleBCs(volScalarField& vf)
+{
+    forAll(alpha1_.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& apf = alpha1_.boundaryField()[patchi];
+
+        if (isA<alphaContactAngleTwoPhaseFvPatchScalarField>(apf))
+        {
+            OStringStream os;
+            apf.write(os);
+            dictionary dict(IStringStream(os.str())());
+
+            dict.set("limit", word("none"));
+            dict.set("value", scalarField(apf.size(), Zero));
+            dict.remove("gradient");
+
+            vf.boundaryFieldRef().set
+            (
+                patchi,
+                fvPatchScalarField::New(apf.patch(), vf, dict)
+            );
+        }
+    }
+}
 
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
 Foam::dimensionedScalar Foam::interfacePropertiesLS::meshSize() const
 {
-    // determine length scale from average cell volume
-    return dimensionedScalar("meshSize", cbrt(average(alpha1_.mesh().V())) );
+    const fvMesh& mesh = alpha1_.mesh();
+
+    // 2D (empty) and axisymmetric (wedge) meshes: the cell extent in the
+    // non-solved direction is unrelated to the resolution, so the mesh size
+    // is taken from the area of the empty/wedge faces instead of the cell
+    // volume.
+    if (mesh.nGeometricD() < 3)
+    {
+        scalar sumA = 0;
+        label nFaces = 0;
+
+        for (const polyPatch& pp : mesh.boundaryMesh())
+        {
+            if (isA<emptyPolyPatch>(pp) || isA<wedgePolyPatch>(pp))
+            {
+                sumA += sum(mag(pp.faceAreas()));
+                nFaces += pp.size();
+            }
+        }
+
+        reduce(sumA, sumOp<scalar>());
+        reduce(nFaces, sumOp<label>());
+
+        if (nFaces > 0)
+        {
+            return dimensionedScalar("meshSize", dimLength, Foam::sqrt(sumA/nFaces));
+        }
+    }
+
+    // 3D: length scale from the average cell volume
+    return dimensionedScalar("meshSize", cbrt(average(mesh.V())));
 }
 
 void Foam::interfacePropertiesLS::calDeltaFunc()
@@ -351,6 +410,20 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
     ),
 
     sigmaPtr_(surfaceTensionModel::New(dict, alpha1.mesh())),
+
+    sigmaTemp_
+    (
+        "sigmaTemp",
+        dimensionSet(1, 0, -2, -1, 0),
+        dict.getOrDefault<scalar>("sigmaTemp", 0)
+    ),
+
+    TRef_
+    (
+        "TRef",
+        dimTemperature,
+        dict.getOrDefault<scalar>("TRef", 0)
+    ),
     
     deltaN_
     (
@@ -399,7 +472,11 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
             IOobject::AUTO_WRITE
         ),
         alpha1_.mesh(),
-        dimensionedScalar(dimless/dimLength, Zero)
+        dimensionedScalar(dimless/dimLength, Zero),
+        // zeroGradient on physical boundaries (constraint/coupled patches
+        // keep their own types), so that boundary values follow the
+        // smoothed cell values in curvatureInterpolation()
+        zeroGradientFvPatchScalarField::typeName
     ),
     
     psi_
@@ -502,11 +579,11 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
     (
         IOobject
         (
-            "scaledH",
+            "scaledHf",
             alpha1_.time().timeName(),
             alpha1_.mesh(),
             IOobject::NO_READ,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         alpha1_.mesh(),
         dimensionedScalar(dimless, Zero)
@@ -514,6 +591,13 @@ Foam::interfacePropertiesLS::interfacePropertiesLS
     
     narrowBand_(psi_)
 {
+    // psi_ and psi0_ were constructed with the patch types of alpha1 only,
+    // so contact-angle patches got default parameters (theta0 = 0) and an
+    // alpha-type limiter. Copy the contact-angle parameters from alpha1 and
+    // disable the limiter (psi is not bounded to [0,1]).
+    copyContactAngleBCs(psi_);
+    copyContactAngleBCs(psi0_);
+
 	Info << "interfacePropertiesLS: meshSize = " << meshSize().value() << endl;
     read();
     calculateK();
@@ -524,6 +608,15 @@ bool Foam::interfacePropertiesLS::read()
 {
     alpha1_.mesh().solverDict(alpha1_.name()).readEntry("cAlpha", cAlpha_);
     sigmaPtr_->readDict(transportPropertiesDict_);
+
+    if (transportPropertiesDict_.found("sigmaTemp"))
+    {
+        sigmaTemp_.value() =
+            transportPropertiesDict_.get<scalar>("sigmaTemp");
+        Info<< "interfacePropertiesLS: sigmaTemp = " << sigmaTemp_.value()
+            << endl;
+    }
+    TRef_.value() = transportPropertiesDict_.getOrDefault<scalar>("TRef", 0);
      
     const dictionary* sclsvofDict =  alpha1_.mesh().solverDict(alpha1_.name()).findDict("SCLSVOF");
    

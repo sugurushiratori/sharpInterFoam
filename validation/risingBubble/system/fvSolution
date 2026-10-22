@@ -1,0 +1,75 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+
+solvers
+{
+    "alpha.water.*"
+    {
+        nAlphaCorr      1;
+        nAlphaSubCycles 2;
+        cAlpha          1;
+
+        SCLSVOF
+        {
+            correctPsi      yes;
+            widthFactor     1.5;
+            densityScaled   yes;
+            initializeAtanh yes;
+            densityFunctionHeaviside yes;
+            denomDeltaTau   10.0;
+            factorNumLoop   1.0;
+            tolMagGradPsi   1e-8;
+        }
+        THINC
+        {
+            enable          yes;
+            epsAlpha        1e-12;
+            epsBeta         1e-2;
+        }
+    }
+
+    "pcorr.*"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-10;
+        relTol          0;
+    }
+
+    p_rgh
+    {
+        solver          GAMG;
+        smoother        DIC;
+        tolerance       1e-9;
+        relTol          0.01;
+    }
+
+    p_rghFinal
+    {
+        $p_rgh;
+        relTol          0;
+    }
+
+    "U.*"
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
+        tolerance       1e-10;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor   yes;
+    nOuterCorrectors    1;
+    nCorrectors         3;
+    nNonOrthogonalCorrectors 0;
+    pRefPoint           (0.5 1.99 0.0001);
+    pRefValue           0;
+}

@@ -1,0 +1,27 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      transportProperties;
+}
+
+// Equal densities and viscosities, Laplace number La = sigma rho lambda/mu^2
+// = 3000: mu = sqrt(1/3000)
+phases (water air);
+
+water
+{
+    transportModel  Newtonian;
+    nu              0.018257418583505537;
+    rho             1;
+}
+
+air
+{
+    transportModel  Newtonian;
+    nu              0.018257418583505537;
+    rho             1;
+}
+
+sigma           1;

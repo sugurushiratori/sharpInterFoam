@@ -1,0 +1,30 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+// Small-amplitude capillary wave (Prosperetti 1981; Popinet 2009):
+// wavelength 1, -0.5 < x < 0.5, -1.5 < y < 1.5 (2D, x-y plane)
+n   32;                       // cells per wavelength
+ny  #eval{ 3*$n };
+dz  #eval{ 1.0/$n };
+
+vertices
+(
+    (-0.5 -1.5 0) (0.5 -1.5 0) (0.5 1.5 0) (-0.5 1.5 0)
+    (-0.5 -1.5 $dz) (0.5 -1.5 $dz) (0.5 1.5 $dz) (-0.5 1.5 $dz)
+);
+
+blocks ( hex (0 1 2 3 4 5 6 7) ($n $ny 1) simpleGrading (1 1 1) );
+
+boundary
+(
+    bottom { type wall; faces ((0 1 5 4)); }
+    top    { type wall; faces ((3 7 6 2)); }
+    left   { type symmetryPlane; faces ((0 4 7 3)); }
+    right  { type symmetryPlane; faces ((2 6 5 1)); }
+    frontAndBack { type empty; faces ((0 3 2 1) (4 5 6 7)); }
+);

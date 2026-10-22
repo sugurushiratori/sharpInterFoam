@@ -1,0 +1,31 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+
+// Linear temperature T = z (gradient 1 in +z): hot at the top
+dimensions      [0 0 0 1 0 0 0];
+internalField   #codeStream
+{
+    codeInclude #{ #include "fvCFD.H" #};
+    codeOptions #{ -I$(LIB_SRC)/finiteVolume/lnInclude -I$(LIB_SRC)/meshTools/lnInclude #};
+    codeLibs    #{ -lmeshTools -lfiniteVolume #};
+    code
+    #{
+        const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+        const fvMesh& mesh = refCast<const fvMesh>(d.db());
+        scalarField T(mesh.C().component(vector::Z));
+        T.writeEntry("", os);
+    #};
+};
+boundaryField
+{
+    top                 { type fixedValue; value uniform 8; }
+    bottom              { type fixedValue; value uniform -8; }
+    side                { type zeroGradient; }
+    "(front|back)"      { type wedge; }
+    axis                { type empty; }
+}

@@ -5,21 +5,22 @@
     \\  /    A nd           | Copyright (C) 2011-2014 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Copyright (C) 2021-2026 Suguru Shiratori
 License
-    This file is part of OpenFOAM.
+    This file is part of sharpInterFoam, a derivative of OpenFOAM.
 
-    OpenFOAM is free software: you can redistribute it and/or modify it
+    sharpInterFoam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    sharpInterFoam is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+    along with sharpInterFoam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -96,6 +97,24 @@ Foam::incompressibleTwoPhaseMixtureLS::incompressibleTwoPhaseMixtureLS
     
     kappa1_("kappa", dimViscosity, nuModel1_->viscosityProperties().getOrDefault<scalar>("kappa", 0.0)),
     kappa2_("kappa", dimViscosity, nuModel2_->viscosityProperties().getOrDefault<scalar>("kappa", 0.0)),
+
+    hasCp_
+    (
+        nuModel1_->viscosityProperties().found("Cp")
+     && nuModel2_->viscosityProperties().found("Cp")
+    ),
+    Cp1_
+    (
+        "Cp",
+        dimensionSet(0, 2, -2, -1, 0),
+        nuModel1_->viscosityProperties().getOrDefault<scalar>("Cp", 0.0)
+    ),
+    Cp2_
+    (
+        "Cp",
+        dimensionSet(0, 2, -2, -1, 0),
+        nuModel2_->viscosityProperties().getOrDefault<scalar>("Cp", 0.0)
+    ),
     
     U_(U),
     phi_(phi),
@@ -182,6 +201,75 @@ Foam::incompressibleTwoPhaseMixtureLS::kappa() const
 
 
 Foam::tmp<Foam::volScalarField>
+Foam::incompressibleTwoPhaseMixtureLS::rhoCp() const
+{
+    if (hasCp_)
+    {
+        return tmp<volScalarField>::New
+        (
+            "rhoCp",
+            densityFunc_*rho1_*Cp1_
+          + (scalar(1) - densityFunc_)*rho2_*Cp2_
+        );
+    }
+
+    return tmp<volScalarField>::New
+    (
+        IOobject
+        (
+            "rhoCp",
+            densityFunc_.time().timeName(),
+            densityFunc_.mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            IOobject::NO_REGISTER
+        ),
+        densityFunc_.mesh(),
+        dimensionedScalar(dimensionSet(1, -1, -2, -1, 0), 1)
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::incompressibleTwoPhaseMixtureLS::lambda() const
+{
+    const dimensionedScalar one(dimensionSet(1, -1, -2, -1, 0), 1);
+    const dimensionedScalar rhoCp1(hasCp_ ? rho1_*Cp1_ : one);
+    const dimensionedScalar rhoCp2(hasCp_ ? rho2_*Cp2_ : one);
+
+    // Harmonic (series) mixing in interface cells: exact effective
+    // resistance for heat flux normal to the interface
+    const dimensionedScalar lambda1(rhoCp1*kappa1_);
+    const dimensionedScalar lambda2(rhoCp2*kappa2_);
+    const dimensionedScalar small(lambda1.dimensions(), VSMALL);
+
+    return tmp<volScalarField>::New
+    (
+        "lambda",
+        scalar(1)
+       /(
+            densityFunc_/(lambda1 + small)
+          + (scalar(1) - densityFunc_)/(lambda2 + small)
+        )
+    );
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::incompressibleTwoPhaseMixtureLS::lambdaf() const
+{
+    const volScalarField lambdaCell(lambda());
+    const dimensionedScalar small(lambdaCell.dimensions(), VSMALL);
+
+    return tmp<surfaceScalarField>::New
+    (
+        "lambdaf",
+        scalar(1)/fvc::interpolate(scalar(1)/(lambdaCell + small))
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField>
 Foam::incompressibleTwoPhaseMixtureLS::mu() const
 {
     return tmp<volScalarField>::New
@@ -251,6 +339,15 @@ bool Foam::incompressibleTwoPhaseMixtureLS::read()
             if(nuModel2_->viscosityProperties().found("kappa"))
             {
                  nuModel2_->viscosityProperties().readEntry("kappa", kappa2_);
+            }
+
+            hasCp_ =
+                nuModel1_->viscosityProperties().found("Cp")
+             && nuModel2_->viscosityProperties().found("Cp");
+            if (hasCp_)
+            {
+                nuModel1_->viscosityProperties().readEntry("Cp", Cp1_);
+                nuModel2_->viscosityProperties().readEntry("Cp", Cp2_);
             }
 
             return true;

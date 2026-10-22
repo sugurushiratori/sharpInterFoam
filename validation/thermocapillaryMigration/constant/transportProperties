@@ -1,0 +1,35 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      transportProperties;
+}
+
+// Young, Goldstein & Block (1959): equal properties of drop and matrix,
+// mu' = k' = 1, so the terminal velocity is
+//     V = 2/((2 + k')(2 + 3 mu')) * (-sigmaTemp) |grad T| R / mu
+//       = (2/15) * 1 * 1 * 0.5 / 1 = 6.667e-2
+// Re = rho V R/mu ~ 0.03, Ma = V R/kappa ~ 0.03, Ca = mu V/sigma ~ 0.07
+// (V is large compared with the spurious currents ~ 1e-3 sigma/mu; the drop
+// stays spherical in Stokes flow). sigma(T) = 1 - T is 0.5 to 1.5 on the drop.
+phases (water air);
+
+water   // drop
+{
+    transportModel  NewtonianThermo;
+    nu              1;
+    rho             1;
+    kappa           1;
+}
+
+air     // surrounding fluid
+{
+    transportModel  NewtonianThermo;
+    nu              1;
+    rho             1;
+    kappa           1;
+}
+
+sigma        1;
+sigmaTemp    -1;
