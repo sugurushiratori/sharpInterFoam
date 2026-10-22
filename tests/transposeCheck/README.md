@@ -14,8 +14,8 @@ correct.
 A coded function object is compiled, so the OpenFOAM development files
 (wmake, compiler) are needed.
 
-With the conda-forge OpenFOAM v2412 (gcc 13.4, `-O2 -ftree-vectorize`)
-both checks report BROKEN: every other cell receives the xz component in
+Results: OpenCFD Debian packages v2412 and v2512: both OK. Conda-forge
+OpenFOAM v2412 (gcc 13.4, `-O2 -ftree-vectorize`): both BROKEN, every other cell receives the xz component in
 place of zx (and similar). This affects the viscous stress of 3D cases
 and of 2D cases in the x-z plane; 2D cases in the x-y plane are not
 affected because the xz and zx components vanish.

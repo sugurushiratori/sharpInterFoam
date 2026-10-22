@@ -152,9 +152,10 @@ maxCapillaryNo  1;               // dt <= maxCapillaryNo * sqrt((rho1 + rho2) h^
 ## Known issues
 
 * Some OpenFOAM builds compute `T()` of a temporary tensor field incorrectly
-  (observed with the conda-forge OpenFOAM v2412, gcc 13). The laminar viscous
-  stress of 3D cases and of 2D cases in the x-z plane is then wrong in every
-  OpenFOAM solver. Run `tests/transposeCheck/Allrun` to check your installation.
+  (observed with the conda-forge OpenFOAM v2412, gcc 13; the OpenCFD Debian
+  packages v2412 and v2512 are correct). The laminar viscous stress of 3D
+  cases and of 2D cases in the x-z plane is then wrong in every OpenFOAM
+  solver. Run `tests/transposeCheck/Allrun` to check your installation.
 * Accuracy limits found in the validation ([docs/validation.md](docs/validation.md)),
   not yet resolved:
   * the viscous damping of capillary oscillations decreases with mesh

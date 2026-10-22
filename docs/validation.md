@@ -3,9 +3,10 @@
 [日本語](ja/validation.md)
 
 OpenFOAM v2412 (conda-forge, gcc 13), 2 cores. This OpenFOAM build fails
-`tests/transposeCheck`; cases in the x-z plane and axisymmetric cases were
-therefore run with the laminar viscous stress computed with an out-of-place
-transpose (not part of the solver). Status of the code: v2.0 development
+`tests/transposeCheck` (the OpenCFD Debian packages v2412 and v2512 pass);
+cases in the x-z plane and axisymmetric cases were therefore run with the
+laminar viscous stress computed with an out-of-place transpose, which gives
+the result of a correct OpenFOAM build (not part of the solver). Status of the code: v2.0 development
 version (see [CHANGELOG](../CHANGELOG.md)).
 
 ## Interface advection: Zalesak disc (paper Sec. 4.1)

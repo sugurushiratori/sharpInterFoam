@@ -3,9 +3,9 @@
 [English](../validation.md)
 
 OpenFOAM v2412（conda-forge, gcc 13）、2 コアで計算。この OpenFOAM ビルドは
-`tests/transposeCheck` で不合格となるため、x-z 面のケースと軸対称ケースは、
-層流の粘性応力を転置のコピーで計算する回避策（ソルバーには含めていない）を
-入れて計算した。コードは v2.0 開発版（[CHANGELOG](../../CHANGELOG.md)）。
+`tests/transposeCheck` で不合格となる（OpenCFD の Debian パッケージ v2412・v2512 は合格）
+ため、x-z 面のケースと軸対称ケースは、層流の粘性応力を転置のコピーで計算する
+回避策（正しいビルドと同じ結果になる。ソルバーには含めていない）を入れて計算した。コードは v2.0 開発版（[CHANGELOG](../../CHANGELOG.md)）。
 
 ## 界面移流：Zalesak 円盤（論文 4.1 節）
 

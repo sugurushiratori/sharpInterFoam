@@ -137,7 +137,8 @@ maxCapillaryNo  1;               // dt <= maxCapillaryNo * sqrt((rho1 + rho2) h^
 ## 既知の問題
 
 * 一部の OpenFOAM ビルドでは、一時テンソル場の転置 `T()` が誤った値を返します
-  （conda-forge 版 OpenFOAM v2412, gcc 13 で確認）。この場合、3 次元計算と
+  （conda-forge 版 OpenFOAM v2412, gcc 13 で確認。OpenCFD の Debian パッケージ
+  v2412・v2512 では正しく計算されます）。この場合、3 次元計算と
   x-z 面の 2 次元計算では、どの OpenFOAM ソルバーでも層流の粘性応力が誤ります。
   お使いの環境は `tests/transposeCheck/Allrun` で確認できます。
 * 検証で見つかった精度の限界（未解決、[docs/ja/validation.md](docs/ja/validation.md)）：
