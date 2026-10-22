@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.0 (unreleased)
+## v2.0 (2026-10-22)
 
 Changes from the version used for the paper (tag `v1.0-ijmsa2021`).
 The numbers given are from the validation runs recorded in
